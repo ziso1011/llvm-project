@@ -31,10 +31,10 @@
 #include "support/ThreadsafeFS.h"
 #include "clang/Tooling/Core/Replacement.h"
 #include "llvm/ADT/FunctionExtras.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -136,13 +136,13 @@ public:
     /// Clangd's workspace root. Relevant for "workspace" operations not bound
     /// to a particular file.
     /// FIXME: If not set, should use the current working directory.
-    llvm::Optional<std::string> WorkspaceRoot;
+    std::optional<std::string> WorkspaceRoot;
 
     /// The resource directory is used to find internal headers, overriding
     /// defaults and -resource-dir compiler flag).
     /// If None, ClangdServer calls CompilerInvocation::GetResourcePath() to
     /// obtain the standard resource directory.
-    llvm::Optional<std::string> ResourceDir = llvm::None;
+    std::optional<std::string> ResourceDir = std::nullopt;
 
     /// Time to wait after a new file version before computing diagnostics.
     DebouncePolicy UpdateDebounce = DebouncePolicy{
@@ -240,7 +240,7 @@ public:
   /// Switch to a corresponding source file when given a header file, and vice
   /// versa.
   void switchSourceHeader(PathRef Path,
-                          Callback<llvm::Optional<clangd::Path>> CB);
+                          Callback<std::optional<clangd::Path>> CB);
 
   /// Get document highlights for a given position.
   void findDocumentHighlights(PathRef File, Position Pos,
@@ -248,7 +248,7 @@ public:
 
   /// Get code hover for a given position.
   void findHover(PathRef File, Position Pos,
-                 Callback<llvm::Optional<HoverInfo>> CB);
+                 Callback<std::optional<HoverInfo>> CB);
 
   /// Get information about type hierarchy for a given position.
   void typeHierarchy(PathRef File, Position Pos, int Resolve,
@@ -256,7 +256,7 @@ public:
                      Callback<std::vector<TypeHierarchyItem>> CB);
   /// Get direct parents of a type hierarchy item.
   void superTypes(const TypeHierarchyItem &Item,
-                  Callback<llvm::Optional<std::vector<TypeHierarchyItem>>> CB);
+                  Callback<std::optional<std::vector<TypeHierarchyItem>>> CB);
   /// Get direct children of a type hierarchy item.
   void subTypes(const TypeHierarchyItem &Item,
                 Callback<std::vector<TypeHierarchyItem>> CB);
@@ -264,7 +264,7 @@ public:
   /// Resolve type hierarchy item in the given direction.
   void resolveTypeHierarchy(TypeHierarchyItem Item, int Resolve,
                             TypeHierarchyDirection Direction,
-                            Callback<llvm::Optional<TypeHierarchyItem>> CB);
+                            Callback<std::optional<TypeHierarchyItem>> CB);
 
   /// Get information about call hierarchy for a given position.
   void prepareCallHierarchy(PathRef File, Position Pos,
@@ -275,7 +275,7 @@ public:
                      Callback<std::vector<CallHierarchyIncomingCall>>);
 
   /// Resolve inlay hints for a given document.
-  void inlayHints(PathRef File, llvm::Optional<Range> RestrictRange,
+  void inlayHints(PathRef File, std::optional<Range> RestrictRange,
                   Callback<std::vector<InlayHint>>);
 
   /// Retrieve the top symbols from the workspace matching a query.
@@ -299,11 +299,11 @@ public:
 
   /// Retrieve locations for symbol references.
   void findReferences(PathRef File, Position Pos, uint32_t Limit,
-                      Callback<ReferencesResult> CB);
+                      bool AddContainer, Callback<ReferencesResult> CB);
 
   /// Run formatting for the \p File with content \p Code.
   /// If \p Rng is non-null, formats only that region.
-  void formatFile(PathRef File, llvm::Optional<Range> Rng,
+  void formatFile(PathRef File, std::optional<Range> Rng,
                   Callback<tooling::Replacements> CB);
 
   /// Run formatting after \p TriggerText was typed at \p Pos in \p File with
@@ -315,7 +315,7 @@ public:
   ///
   /// If NewName is provided, it performs a name validation.
   void prepareRename(PathRef File, Position Pos,
-                     llvm::Optional<std::string> NewName,
+                     std::optional<std::string> NewName,
                      const RenameOptions &RenameOpts,
                      Callback<RenameResult> CB);
 
@@ -361,8 +361,8 @@ public:
                           Callback<std::vector<HighlightingToken>>);
 
   /// Describe the AST subtree for a piece of code.
-  void getAST(PathRef File, llvm::Optional<Range> R,
-              Callback<llvm::Optional<ASTNode>> CB);
+  void getAST(PathRef File, std::optional<Range> R,
+              Callback<std::optional<ASTNode>> CB);
 
   /// Runs an arbitrary action that has access to the AST of the specified file.
   /// The action will execute on one of ClangdServer's internal threads.
@@ -397,7 +397,7 @@ public:
   // FIXME: various subcomponents each get the full timeout, so it's more of
   // an order of magnitude than a hard deadline.
   [[nodiscard]] bool
-  blockUntilIdleForTest(llvm::Optional<double> TimeoutSeconds = 10);
+  blockUntilIdleForTest(std::optional<double> TimeoutSeconds = 10);
 
   /// Builds a nested representation of memory used by components.
   void profile(MemoryTree &MT) const;
@@ -435,13 +435,13 @@ private:
   bool PreambleParseForwardingFunctions = false;
 
   // GUARDED_BY(CachedCompletionFuzzyFindRequestMutex)
-  llvm::StringMap<llvm::Optional<FuzzyFindRequest>>
+  llvm::StringMap<std::optional<FuzzyFindRequest>>
       CachedCompletionFuzzyFindRequestByFile;
   mutable std::mutex CachedCompletionFuzzyFindRequestMutex;
 
-  llvm::Optional<std::string> WorkspaceRoot;
-  llvm::Optional<AsyncTaskRunner> IndexTasks; // for stdlib indexing.
-  llvm::Optional<TUScheduler> WorkScheduler;
+  std::optional<std::string> WorkspaceRoot;
+  std::optional<AsyncTaskRunner> IndexTasks; // for stdlib indexing.
+  std::optional<TUScheduler> WorkScheduler;
   // Invalidation policy used for actions that we assume are "transient".
   TUScheduler::ASTActionInvalidation Transient;
 

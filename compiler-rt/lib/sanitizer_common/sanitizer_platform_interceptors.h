@@ -273,7 +273,7 @@
 #if SI_LINUX_NOT_ANDROID &&                                                \
     (defined(__i386) || defined(__x86_64) || defined(__mips64) ||          \
      defined(__powerpc64__) || defined(__aarch64__) || defined(__arm__) || \
-     defined(__s390__) || SANITIZER_RISCV64)
+     defined(__s390__) || defined(__loongarch__) || SANITIZER_RISCV64)
 #define SANITIZER_INTERCEPT_PTRACE 1
 #else
 #define SANITIZER_INTERCEPT_PTRACE 0
@@ -396,8 +396,6 @@
 #define SANITIZER_INTERCEPT__EXIT \
   (SI_LINUX || SI_FREEBSD || SI_NETBSD || SI_MAC || SI_SOLARIS)
 
-#define SANITIZER_INTERCEPT_PTHREAD_MUTEX SI_POSIX
-#define SANITIZER_INTERCEPT___PTHREAD_MUTEX SI_GLIBC
 #define SANITIZER_INTERCEPT___LIBC_MUTEX SI_NETBSD
 #define SANITIZER_INTERCEPT_PTHREAD_SETNAME_NP \
   (SI_FREEBSD || SI_NETBSD || SI_GLIBC || SI_SOLARIS)

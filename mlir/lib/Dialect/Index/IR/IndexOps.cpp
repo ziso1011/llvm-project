@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
+#include "llvm/ADT/SmallString.h"
 
 using namespace mlir;
 using namespace mlir::index;
@@ -74,7 +75,7 @@ static OpFoldResult foldBinaryOpUnchecked(
     return {};
   assert(result->trunc(32) ==
          calculate(lhs.getValue().trunc(32), rhs.getValue().trunc(32)));
-  return IntegerAttr::get(IndexType::get(lhs.getContext()), std::move(*result));
+  return IntegerAttr::get(IndexType::get(lhs.getContext()), *result);
 }
 
 /// Fold an index operation only if the truncated 64-bit result matches the
@@ -83,8 +84,8 @@ static OpFoldResult foldBinaryOpUnchecked(
 /// bits of the results.
 ///
 /// The function accepts a lambda that computes the integer result in both
-/// 64-bit and 32-bit. If either call returns `None`, the operation is not
-/// folded.
+/// 64-bit and 32-bit. If either call returns `std::nullopt`, the operation is
+/// not folded.
 static OpFoldResult foldBinaryOpChecked(
     ArrayRef<Attribute> operands,
     function_ref<Optional<APInt>(const APInt &, const APInt &lhs)> calculate) {
@@ -107,8 +108,7 @@ static OpFoldResult foldBinaryOpChecked(
   if (result64->trunc(32) != *result32)
     return {};
   // The operation can be folded for these particular operands.
-  return IntegerAttr::get(IndexType::get(lhs.getContext()),
-                          std::move(*result64));
+  return IntegerAttr::get(IndexType::get(lhs.getContext()), *result64);
 }
 
 //===----------------------------------------------------------------------===//
@@ -147,7 +147,7 @@ OpFoldResult DivSOp::fold(ArrayRef<Attribute> operands) {
       operands, [](const APInt &lhs, const APInt &rhs) -> Optional<APInt> {
         // Don't fold division by zero.
         if (rhs.isZero())
-          return None;
+          return std::nullopt;
         return lhs.sdiv(rhs);
       });
 }
@@ -161,7 +161,7 @@ OpFoldResult DivUOp::fold(ArrayRef<Attribute> operands) {
       operands, [](const APInt &lhs, const APInt &rhs) -> Optional<APInt> {
         // Don't fold division by zero.
         if (rhs.isZero())
-          return None;
+          return std::nullopt;
         return lhs.udiv(rhs);
       });
 }
@@ -175,7 +175,7 @@ OpFoldResult DivUOp::fold(ArrayRef<Attribute> operands) {
 static Optional<APInt> calculateCeilDivS(const APInt &n, const APInt &m) {
   // Don't fold division by zero.
   if (m.isZero())
-    return None;
+    return std::nullopt;
   // Short-circuit the zero case.
   if (n.isZero())
     return n;
@@ -207,7 +207,7 @@ OpFoldResult CeilDivUOp::fold(ArrayRef<Attribute> operands) {
       operands, [](const APInt &n, const APInt &m) -> Optional<APInt> {
         // Don't fold division by zero.
         if (m.isZero())
-          return None;
+          return std::nullopt;
         // Short-circuit the zero case.
         if (n.isZero())
           return n;
@@ -225,7 +225,7 @@ OpFoldResult CeilDivUOp::fold(ArrayRef<Attribute> operands) {
 static Optional<APInt> calculateFloorDivS(const APInt &n, const APInt &m) {
   // Don't fold division by zero.
   if (m.isZero())
-    return None;
+    return std::nullopt;
   // Short-circuit the zero case.
   if (n.isZero())
     return n;
@@ -331,6 +331,33 @@ OpFoldResult ShrUOp::fold(ArrayRef<Attribute> operands) {
 }
 
 //===----------------------------------------------------------------------===//
+// AndOp
+//===----------------------------------------------------------------------===//
+
+OpFoldResult AndOp::fold(ArrayRef<Attribute> operands) {
+  return foldBinaryOpUnchecked(
+      operands, [](const APInt &lhs, const APInt &rhs) { return lhs & rhs; });
+}
+
+//===----------------------------------------------------------------------===//
+// OrOp
+//===----------------------------------------------------------------------===//
+
+OpFoldResult OrOp::fold(ArrayRef<Attribute> operands) {
+  return foldBinaryOpUnchecked(
+      operands, [](const APInt &lhs, const APInt &rhs) { return lhs | rhs; });
+}
+
+//===----------------------------------------------------------------------===//
+// XOrOp
+//===----------------------------------------------------------------------===//
+
+OpFoldResult XOrOp::fold(ArrayRef<Attribute> operands) {
+  return foldBinaryOpUnchecked(
+      operands, [](const APInt &lhs, const APInt &rhs) { return lhs ^ rhs; });
+}
+
+//===----------------------------------------------------------------------===//
 // CastSOp
 //===----------------------------------------------------------------------===//
 
@@ -398,6 +425,14 @@ OpFoldResult CmpOp::fold(ArrayRef<Attribute> operands) {
 // ConstantOp
 //===----------------------------------------------------------------------===//
 
+void ConstantOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  SmallString<32> specialNameBuffer;
+  llvm::raw_svector_ostream specialName(specialNameBuffer);
+  specialName << "idx" << getValueAttr().getValue();
+  setNameFn(getResult(), specialName.str());
+}
+
 OpFoldResult ConstantOp::fold(ArrayRef<Attribute> operands) {
   return getValueAttr();
 }
@@ -412,6 +447,11 @@ void ConstantOp::build(OpBuilder &b, OperationState &state, int64_t value) {
 
 OpFoldResult BoolConstantOp::fold(ArrayRef<Attribute> operands) {
   return getValueAttr();
+}
+
+void BoolConstantOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), getValue() ? "true" : "false");
 }
 
 //===----------------------------------------------------------------------===//

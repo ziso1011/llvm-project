@@ -40,6 +40,7 @@
 #include "SymbolFileDWARF.h"
 
 #include <memory>
+#include <optional>
 
 using namespace lldb;
 using namespace lldb_private;
@@ -777,14 +778,14 @@ Type *SymbolFileDWARFDebugMap::ResolveTypeUID(lldb::user_id_t type_uid) {
   return nullptr;
 }
 
-llvm::Optional<SymbolFile::ArrayInfo>
+std::optional<SymbolFile::ArrayInfo>
 SymbolFileDWARFDebugMap::GetDynamicArrayInfoForUID(
     lldb::user_id_t type_uid, const lldb_private::ExecutionContext *exe_ctx) {
   const uint64_t oso_idx = GetOSOIndexFromUserID(type_uid);
   SymbolFileDWARF *oso_dwarf = GetSymbolFileByOSOIndex(oso_idx);
   if (oso_dwarf)
     return oso_dwarf->GetDynamicArrayInfoForUID(type_uid, exe_ctx);
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool SymbolFileDWARFDebugMap::CompleteType(CompilerType &compiler_type) {
@@ -1125,10 +1126,10 @@ SymbolFileDWARFDebugMap::ParseCallEdgesInFunction(UserID func_id) {
 }
 
 TypeSP SymbolFileDWARFDebugMap::FindDefinitionTypeForDWARFDeclContext(
-    const DWARFDeclContext &die_decl_ctx) {
+    const DWARFDIE &die) {
   TypeSP type_sp;
   ForEachSymbolFile([&](SymbolFileDWARF *oso_dwarf) -> bool {
-    type_sp = oso_dwarf->FindDefinitionTypeForDWARFDeclContext(die_decl_ctx);
+    type_sp = oso_dwarf->FindDefinitionTypeForDWARFDeclContext(die);
     return ((bool)type_sp);
   });
   return type_sp;

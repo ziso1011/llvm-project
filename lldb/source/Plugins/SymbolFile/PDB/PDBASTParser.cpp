@@ -40,6 +40,7 @@
 #include "llvm/DebugInfo/PDB/PDBSymbolTypeUDT.h"
 
 #include "Plugins/Language/CPlusPlus/MSVCUndecoratedNameParser.h"
+#include <optional>
 
 using namespace lldb;
 using namespace lldb_private;
@@ -120,24 +121,31 @@ GetBuiltinTypeForPDBEncodingAndBitSize(TypeSystemClang &clang_ast,
     return clang_ast.GetBasicType(eBasicTypeBool);
   case PDB_BuiltinType::Long:
     if (width == ast.getTypeSize(ast.LongTy))
-      return CompilerType(&clang_ast, ast.LongTy.getAsOpaquePtr());
+      return CompilerType(clang_ast.weak_from_this(),
+                          ast.LongTy.getAsOpaquePtr());
     if (width == ast.getTypeSize(ast.LongLongTy))
-      return CompilerType(&clang_ast, ast.LongLongTy.getAsOpaquePtr());
+      return CompilerType(clang_ast.weak_from_this(),
+                          ast.LongLongTy.getAsOpaquePtr());
     break;
   case PDB_BuiltinType::ULong:
     if (width == ast.getTypeSize(ast.UnsignedLongTy))
-      return CompilerType(&clang_ast, ast.UnsignedLongTy.getAsOpaquePtr());
+      return CompilerType(clang_ast.weak_from_this(),
+                          ast.UnsignedLongTy.getAsOpaquePtr());
     if (width == ast.getTypeSize(ast.UnsignedLongLongTy))
-      return CompilerType(&clang_ast, ast.UnsignedLongLongTy.getAsOpaquePtr());
+      return CompilerType(clang_ast.weak_from_this(),
+                          ast.UnsignedLongLongTy.getAsOpaquePtr());
     break;
   case PDB_BuiltinType::WCharT:
     if (width == ast.getTypeSize(ast.WCharTy))
-      return CompilerType(&clang_ast, ast.WCharTy.getAsOpaquePtr());
+      return CompilerType(clang_ast.weak_from_this(),
+                          ast.WCharTy.getAsOpaquePtr());
     break;
   case PDB_BuiltinType::Char16:
-    return CompilerType(&clang_ast, ast.Char16Ty.getAsOpaquePtr());
+    return CompilerType(clang_ast.weak_from_this(),
+                        ast.Char16Ty.getAsOpaquePtr());
   case PDB_BuiltinType::Char32:
-    return CompilerType(&clang_ast, ast.Char32Ty.getAsOpaquePtr());
+    return CompilerType(clang_ast.weak_from_this(),
+                        ast.Char32Ty.getAsOpaquePtr());
   case PDB_BuiltinType::Float:
     // Note: types `long double` and `double` have same bit size in MSVC and
     // there is no information in the PDB to distinguish them. So when falling
@@ -573,7 +581,7 @@ lldb::TypeSP PDBASTParser::CreateLLDBTypeFromPDBType(const PDBSymbol &type) {
       ast_typedef = ast_typedef.AddVolatileModifier();
 
     GetDeclarationForSymbol(type, decl);
-    llvm::Optional<uint64_t> size;
+    std::optional<uint64_t> size;
     if (type_def->getLength())
       size = type_def->getLength();
     return std::make_shared<lldb_private::Type>(
@@ -656,7 +664,7 @@ lldb::TypeSP PDBASTParser::CreateLLDBTypeFromPDBType(const PDBSymbol &type) {
     GetDeclarationForSymbol(type, decl);
     return std::make_shared<lldb_private::Type>(
         type.getSymIndexId(), m_ast.GetSymbolFile(), ConstString(name),
-        llvm::None, nullptr, LLDB_INVALID_UID,
+        std::nullopt, nullptr, LLDB_INVALID_UID,
         lldb_private::Type::eEncodingIsUID, decl, func_sig_ast_type,
         lldb_private::Type::ResolveState::Full);
   } break;
@@ -665,7 +673,7 @@ lldb::TypeSP PDBASTParser::CreateLLDBTypeFromPDBType(const PDBSymbol &type) {
     assert(array_type);
     uint32_t num_elements = array_type->getCount();
     uint32_t element_uid = array_type->getElementTypeId();
-    llvm::Optional<uint64_t> bytes;
+    std::optional<uint64_t> bytes;
     if (uint64_t size = array_type->getLength())
       bytes = size;
 
@@ -706,7 +714,7 @@ lldb::TypeSP PDBASTParser::CreateLLDBTypeFromPDBType(const PDBSymbol &type) {
     if (builtin_kind == PDB_BuiltinType::None)
       return nullptr;
 
-    llvm::Optional<uint64_t> bytes;
+    std::optional<uint64_t> bytes;
     if (uint64_t size = builtin_type->getLength())
       bytes = size;
     Encoding encoding = TranslateBuiltinEncoding(builtin_kind);

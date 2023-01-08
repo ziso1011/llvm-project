@@ -1058,7 +1058,7 @@ ExprResult Sema::DefaultVariadicArgumentPromotion(Expr *E, VariadicCallType CT,
       return ExprError();
 
     ExprResult Call = BuildCallExpr(TUScope, TrapFn.get(), E->getBeginLoc(),
-                                    None, E->getEndLoc());
+                                    std::nullopt, E->getEndLoc());
     if (Call.isInvalid())
       return ExprError();
 
@@ -1963,8 +1963,8 @@ Sema::ActOnStringLiteral(ArrayRef<Token> StringToks, Scope *UDLScope) {
     TemplateArgument Arg(Lit);
     TemplateArgumentLocInfo ArgInfo(Lit);
     ExplicitArgs.addArgument(TemplateArgumentLoc(Arg, ArgInfo));
-    return BuildLiteralOperatorCall(R, OpNameInfo, None, StringTokLocs.back(),
-                                    &ExplicitArgs);
+    return BuildLiteralOperatorCall(R, OpNameInfo, std::nullopt,
+                                    StringTokLocs.back(), &ExplicitArgs);
   }
 
   case LOLR_StringTemplatePack: {
@@ -1984,8 +1984,8 @@ Sema::ActOnStringLiteral(ArrayRef<Token> StringToks, Scope *UDLScope) {
       TemplateArgumentLocInfo ArgInfo;
       ExplicitArgs.addArgument(TemplateArgumentLoc(Arg, ArgInfo));
     }
-    return BuildLiteralOperatorCall(R, OpNameInfo, None, StringTokLocs.back(),
-                                    &ExplicitArgs);
+    return BuildLiteralOperatorCall(R, OpNameInfo, std::nullopt,
+                                    StringTokLocs.back(), &ExplicitArgs);
   }
   case LOLR_Raw:
   case LOLR_ErrorNoDiagnostic:
@@ -2624,7 +2624,7 @@ Sema::ActOnIdExpression(Scope *S, CXXScopeSpec &SS,
     // a template name, but we happen to have always already looked up the name
     // before we get here if it must be a template name.
     if (DiagnoseEmptyLookup(S, SS, R, CCC ? *CCC : DefaultValidator, nullptr,
-                            None, &TE)) {
+                            std::nullopt, &TE)) {
       if (TE && KeywordReplacement) {
         auto &State = getTypoExprState(TE);
         auto BestTC = State.Consumer->getNextCorrection();
@@ -2736,6 +2736,10 @@ Sema::ActOnIdExpression(Scope *S, CXXScopeSpec &SS,
 ExprResult Sema::BuildQualifiedDeclarationNameExpr(
     CXXScopeSpec &SS, const DeclarationNameInfo &NameInfo,
     bool IsAddressOfOperand, const Scope *S, TypeSourceInfo **RecoveryTSI) {
+  if (NameInfo.getName().isDependentName())
+    return BuildDependentDeclRefExpr(SS, /*TemplateKWLoc=*/SourceLocation(),
+                                     NameInfo, /*TemplateArgs=*/nullptr);
+
   DeclContext *DC = computeDeclContext(SS, false);
   if (!DC)
     return BuildDependentDeclRefExpr(SS, /*TemplateKWLoc=*/SourceLocation(),
@@ -3855,7 +3859,7 @@ ExprResult Sema::ActOnNumericConstant(const Token &Tok, Scope *UDLScope) {
         TemplateArgumentLocInfo ArgInfo;
         ExplicitArgs.addArgument(TemplateArgumentLoc(Arg, ArgInfo));
       }
-      return BuildLiteralOperatorCall(R, OpNameInfo, None, TokLoc,
+      return BuildLiteralOperatorCall(R, OpNameInfo, std::nullopt, TokLoc,
                                       &ExplicitArgs);
     }
     case LOLR_StringTemplatePack:
@@ -5856,8 +5860,10 @@ Sema::CreateBuiltinArraySubscriptExpr(Expr *Base, SourceLocation LLoc,
 }
 
 bool Sema::CheckCXXDefaultArgExpr(SourceLocation CallLoc, FunctionDecl *FD,
-                                  ParmVarDecl *Param) {
+                                  ParmVarDecl *Param, Expr *RewrittenInit,
+                                  bool SkipImmediateInvocations) {
   if (Param->hasUnparsedDefaultArg()) {
+    assert(!RewrittenInit && "Should not have a rewritten init expression yet");
     // If we've already cleared out the location for the default argument,
     // that means we're parsing it right now.
     if (!UnparsedDefaultArgLocs.count(Param)) {
@@ -5874,11 +5880,14 @@ bool Sema::CheckCXXDefaultArgExpr(SourceLocation CallLoc, FunctionDecl *FD,
     return true;
   }
 
-  if (Param->hasUninstantiatedDefaultArg() &&
-      InstantiateDefaultArgument(CallLoc, FD, Param))
-    return true;
+  if (Param->hasUninstantiatedDefaultArg()) {
+    assert(!RewrittenInit && "Should not have a rewitten init expression yet");
+    if (InstantiateDefaultArgument(CallLoc, FD, Param))
+      return true;
+  }
 
-  assert(Param->hasInit() && "default argument but no initializer?");
+  Expr *Init = RewrittenInit ? RewrittenInit : Param->getInit();
+  assert(Init && "default argument but no initializer?");
 
   // If the default expression creates temporaries, we need to
   // push them to the current stack of expression temporaries so they'll
@@ -5887,34 +5896,258 @@ bool Sema::CheckCXXDefaultArgExpr(SourceLocation CallLoc, FunctionDecl *FD,
   // bound temporaries; see the comment in PR5810.
   // We don't need to do that with block decls, though, because
   // blocks in default argument expression can never capture anything.
-  if (auto Init = dyn_cast<ExprWithCleanups>(Param->getInit())) {
+  if (auto *InitWithCleanup = dyn_cast<ExprWithCleanups>(Init)) {
     // Set the "needs cleanups" bit regardless of whether there are
     // any explicit objects.
-    Cleanup.setExprNeedsCleanups(Init->cleanupsHaveSideEffects());
-
+    Cleanup.setExprNeedsCleanups(InitWithCleanup->cleanupsHaveSideEffects());
     // Append all the objects to the cleanup list.  Right now, this
     // should always be a no-op, because blocks in default argument
     // expressions should never be able to capture anything.
-    assert(!Init->getNumObjects() &&
+    assert(!InitWithCleanup->getNumObjects() &&
            "default argument expression has capturing blocks?");
   }
-
-  // We already type-checked the argument, so we know it works.
-  // Just mark all of the declarations in this potentially-evaluated expression
-  // as being "referenced".
   EnterExpressionEvaluationContext EvalContext(
       *this, ExpressionEvaluationContext::PotentiallyEvaluated, Param);
-  MarkDeclarationsReferencedInExpr(Param->getDefaultArg(),
-                                   /*SkipLocalVariables=*/true);
+  ExprEvalContexts.back().IsCurrentlyCheckingDefaultArgumentOrInitializer =
+      SkipImmediateInvocations;
+  MarkDeclarationsReferencedInExpr(Init, /*SkipLocalVariables*/ true);
   return false;
 }
 
+struct ImmediateCallVisitor : public RecursiveASTVisitor<ImmediateCallVisitor> {
+  bool HasImmediateCalls = false;
+
+  bool shouldVisitImplicitCode() const { return true; }
+
+  bool VisitCallExpr(CallExpr *E) {
+    if (const FunctionDecl *FD = E->getDirectCallee())
+      HasImmediateCalls |= FD->isConsteval();
+    return RecursiveASTVisitor<ImmediateCallVisitor>::VisitStmt(E);
+  }
+
+  // SourceLocExpr are not immediate invocations
+  // but CXXDefaultInitExpr/CXXDefaultArgExpr containing a SourceLocExpr
+  // need to be rebuilt so that they refer to the correct SourceLocation and
+  // DeclContext.
+  bool VisitSourceLocExpr(SourceLocExpr *E) {
+    HasImmediateCalls = true;
+    return RecursiveASTVisitor<ImmediateCallVisitor>::VisitStmt(E);
+  }
+
+  // A nested lambda might have parameters with immediate invocations
+  // in their default arguments.
+  // The compound statement is not visited (as it does not constitute a
+  // subexpression).
+  // FIXME: We should consider visiting and transforming captures
+  // with init expressions.
+  bool VisitLambdaExpr(LambdaExpr *E) {
+    return VisitCXXMethodDecl(E->getCallOperator());
+  }
+
+  // Blocks don't support default parameters, and, as for lambdas,
+  // we don't consider their body a subexpression.
+  bool VisitBlockDecl(BlockDecl *B) { return false; }
+
+  bool VisitCompoundStmt(CompoundStmt *B) { return false; }
+
+  bool VisitCXXDefaultArgExpr(CXXDefaultArgExpr *E) {
+    return TraverseStmt(E->getExpr());
+  }
+
+  bool VisitCXXDefaultInitExpr(CXXDefaultInitExpr *E) {
+    return TraverseStmt(E->getExpr());
+  }
+};
+
+struct EnsureImmediateInvocationInDefaultArgs
+    : TreeTransform<EnsureImmediateInvocationInDefaultArgs> {
+  EnsureImmediateInvocationInDefaultArgs(Sema &SemaRef)
+      : TreeTransform(SemaRef) {}
+
+  // Lambda can only have immediate invocations in the default
+  // args of their parameters, which is transformed upon calling the closure.
+  // The body is not a subexpression, so we have nothing to do.
+  // FIXME: Immediate calls in capture initializers should be transformed.
+  ExprResult TransformLambdaExpr(LambdaExpr *E) { return E; }
+  ExprResult TransformBlockExpr(BlockExpr *E) { return E; }
+
+  // Make sure we don't rebuild the this pointer as it would
+  // cause it to incorrectly point it to the outermost class
+  // in the case of nested struct initialization.
+  ExprResult TransformCXXThisExpr(CXXThisExpr *E) { return E; }
+};
+
 ExprResult Sema::BuildCXXDefaultArgExpr(SourceLocation CallLoc,
-                                        FunctionDecl *FD, ParmVarDecl *Param) {
+                                        FunctionDecl *FD, ParmVarDecl *Param,
+                                        Expr *Init) {
   assert(Param->hasDefaultArg() && "can't build nonexistent default arg");
-  if (CheckCXXDefaultArgExpr(CallLoc, FD, Param))
+
+  bool NestedDefaultChecking = isCheckingDefaultArgumentOrInitializer();
+
+  llvm::Optional<ExpressionEvaluationContextRecord::InitializationContext>
+      InitializationContext =
+          OutermostDeclarationWithDelayedImmediateInvocations();
+  if (!InitializationContext.has_value())
+    InitializationContext.emplace(CallLoc, Param, CurContext);
+
+  if (!Init && !Param->hasUnparsedDefaultArg()) {
+    // Mark that we are replacing a default argument first.
+    // If we are instantiating a template we won't have to
+    // retransform immediate calls.
+    EnterExpressionEvaluationContext EvalContext(
+        *this, ExpressionEvaluationContext::PotentiallyEvaluated, Param);
+
+    if (Param->hasUninstantiatedDefaultArg()) {
+      if (InstantiateDefaultArgument(CallLoc, FD, Param))
+        return ExprError();
+    }
+    // CWG2631
+    // An immediate invocation that is not evaluated where it appears is
+    // evaluated and checked for whether it is a constant expression at the
+    // point where the enclosing initializer is used in a function call.
+    ImmediateCallVisitor V;
+    if (!NestedDefaultChecking)
+      V.TraverseDecl(Param);
+    if (V.HasImmediateCalls) {
+      ExprEvalContexts.back().DelayedDefaultInitializationContext = {
+          CallLoc, Param, CurContext};
+      EnsureImmediateInvocationInDefaultArgs Immediate(*this);
+      ExprResult Res = Immediate.TransformInitializer(Param->getInit(),
+                                                      /*NotCopy=*/false);
+      if (Res.isInvalid())
+        return ExprError();
+      Res = ConvertParamDefaultArgument(Param, Res.get(),
+                                        Res.get()->getBeginLoc());
+      if (Res.isInvalid())
+        return ExprError();
+      Init = Res.get();
+    }
+  }
+
+  if (CheckCXXDefaultArgExpr(
+          CallLoc, FD, Param, Init,
+          /*SkipImmediateInvocations=*/NestedDefaultChecking))
     return ExprError();
-  return CXXDefaultArgExpr::Create(Context, CallLoc, Param, CurContext);
+
+  return CXXDefaultArgExpr::Create(Context, InitializationContext->Loc, Param,
+                                   Init, InitializationContext->Context);
+}
+
+ExprResult Sema::BuildCXXDefaultInitExpr(SourceLocation Loc, FieldDecl *Field) {
+  assert(Field->hasInClassInitializer());
+
+  // If we might have already tried and failed to instantiate, don't try again.
+  if (Field->isInvalidDecl())
+    return ExprError();
+
+  auto *ParentRD = cast<CXXRecordDecl>(Field->getParent());
+
+  llvm::Optional<ExpressionEvaluationContextRecord::InitializationContext>
+      InitializationContext =
+          OutermostDeclarationWithDelayedImmediateInvocations();
+  if (!InitializationContext.has_value())
+    InitializationContext.emplace(Loc, Field, CurContext);
+
+  Expr *Init = nullptr;
+
+  bool NestedDefaultChecking = isCheckingDefaultArgumentOrInitializer();
+
+  EnterExpressionEvaluationContext EvalContext(
+      *this, ExpressionEvaluationContext::PotentiallyEvaluated, Field);
+
+  if (!Field->getInClassInitializer()) {
+    // Maybe we haven't instantiated the in-class initializer. Go check the
+    // pattern FieldDecl to see if it has one.
+    if (isTemplateInstantiation(ParentRD->getTemplateSpecializationKind())) {
+      CXXRecordDecl *ClassPattern = ParentRD->getTemplateInstantiationPattern();
+      DeclContext::lookup_result Lookup =
+          ClassPattern->lookup(Field->getDeclName());
+
+      FieldDecl *Pattern = nullptr;
+      for (auto *L : Lookup) {
+        if ((Pattern = dyn_cast<FieldDecl>(L)))
+          break;
+      }
+      assert(Pattern && "We must have set the Pattern!");
+      if (!Pattern->hasInClassInitializer() ||
+          InstantiateInClassInitializer(Loc, Field, Pattern,
+                                        getTemplateInstantiationArgs(Field))) {
+        Field->setInvalidDecl();
+        return ExprError();
+      }
+    }
+  }
+
+  // CWG2631
+  // An immediate invocation that is not evaluated where it appears is
+  // evaluated and checked for whether it is a constant expression at the
+  // point where the enclosing initializer is used in a [...] a constructor
+  // definition, or an aggregate initialization.
+  ImmediateCallVisitor V;
+  if (!NestedDefaultChecking)
+    V.TraverseDecl(Field);
+  if (V.HasImmediateCalls) {
+    ExprEvalContexts.back().DelayedDefaultInitializationContext = {Loc, Field,
+                                                                   CurContext};
+    ExprEvalContexts.back().IsCurrentlyCheckingDefaultArgumentOrInitializer =
+        NestedDefaultChecking;
+
+    EnsureImmediateInvocationInDefaultArgs Immediate(*this);
+
+    ExprResult Res =
+        Immediate.TransformInitializer(Field->getInClassInitializer(),
+                                       /*CXXDirectInit=*/false);
+    if (!Res.isInvalid())
+      Res = ConvertMemberDefaultInitExpression(Field, Res.get(), Loc);
+    if (Res.isInvalid()) {
+      Field->setInvalidDecl();
+      return ExprError();
+    }
+    Init = Res.get();
+  }
+
+  if (Field->getInClassInitializer()) {
+    Expr *E = Init ? Init : Field->getInClassInitializer();
+    if (!NestedDefaultChecking)
+      MarkDeclarationsReferencedInExpr(E, /*SkipLocalVariables=*/false);
+    // C++11 [class.base.init]p7:
+    //   The initialization of each base and member constitutes a
+    //   full-expression.
+    ExprResult Res = ActOnFinishFullExpr(E, /*DiscardedValue=*/false);
+    if (Res.isInvalid()) {
+      Field->setInvalidDecl();
+      return ExprError();
+    }
+    Init = Res.get();
+
+    return CXXDefaultInitExpr::Create(Context, InitializationContext->Loc,
+                                      Field, InitializationContext->Context,
+                                      Init);
+  }
+
+  // DR1351:
+  //   If the brace-or-equal-initializer of a non-static data member
+  //   invokes a defaulted default constructor of its class or of an
+  //   enclosing class in a potentially evaluated subexpression, the
+  //   program is ill-formed.
+  //
+  // This resolution is unworkable: the exception specification of the
+  // default constructor can be needed in an unevaluated context, in
+  // particular, in the operand of a noexcept-expression, and we can be
+  // unable to compute an exception specification for an enclosed class.
+  //
+  // Any attempt to resolve the exception specification of a defaulted default
+  // constructor before the initializer is lexically complete will ultimately
+  // come here at which point we can diagnose it.
+  RecordDecl *OutermostClass = ParentRD->getOuterLexicalRecordContext();
+  Diag(Loc, diag::err_default_member_initializer_not_yet_parsed)
+      << OutermostClass << Field;
+  Diag(Field->getEndLoc(),
+       diag::note_default_member_initializer_not_yet_parsed);
+  // Recover by marking the field invalid, unless we're in a SFINAE context.
+  if (!isSFINAEContext())
+    Field->setInvalidDecl();
+  return ExprError();
 }
 
 Sema::VariadicCallType
@@ -8258,7 +8491,9 @@ static QualType checkConditionalPointerCompatibility(Sema &S, ExprResult &LHS,
   lhptee = S.Context.getQualifiedType(lhptee.getUnqualifiedType(), lhQual);
   rhptee = S.Context.getQualifiedType(rhptee.getUnqualifiedType(), rhQual);
 
-  QualType CompositeTy = S.Context.mergeTypes(lhptee, rhptee);
+  QualType CompositeTy = S.Context.mergeTypes(
+      lhptee, rhptee, /*OfBlockPointer=*/false, /*Unqualified=*/false,
+      /*BlockReturnType=*/false, /*IsConditionalOperator=*/true);
 
   if (CompositeTy.isNull()) {
     // In this situation, we assume void* type. No especially good
@@ -9065,8 +9300,8 @@ static QualType computeConditionalNullability(QualType ResTy, bool IsBin,
   if (!ResTy->isAnyPointerType())
     return ResTy;
 
-  auto GetNullability = [&Ctx](QualType Ty) {
-    Optional<NullabilityKind> Kind = Ty->getNullability(Ctx);
+  auto GetNullability = [](QualType Ty) {
+    Optional<NullabilityKind> Kind = Ty->getNullability();
     if (Kind) {
       // For our purposes, treat _Nullable_result as _Nullable.
       if (*Kind == NullabilityKind::NullableResult)
@@ -9103,7 +9338,7 @@ static QualType computeConditionalNullability(QualType ResTy, bool IsBin,
     return ResTy;
 
   // Strip all nullability from ResTy.
-  while (ResTy->getNullability(Ctx))
+  while (ResTy->getNullability())
     ResTy = ResTy.getSingleStepDesugaredType(Ctx);
 
   // Create a new AttributedType with the new nullability kind.
@@ -9240,7 +9475,8 @@ static bool IsInvalidCmseNSCallConversion(Sema &S, QualType FromType,
 // This circumvents the usual type rules specified in 6.2.7p1 & 6.7.5.[1-3].
 // FIXME: add a couple examples in this comment.
 static Sema::AssignConvertType
-checkPointerTypesForAssignment(Sema &S, QualType LHSType, QualType RHSType) {
+checkPointerTypesForAssignment(Sema &S, QualType LHSType, QualType RHSType,
+                               SourceLocation Loc) {
   assert(LHSType.isCanonical() && "LHS not canonicalized!");
   assert(RHSType.isCanonical() && "RHS not canonicalized!");
 
@@ -9308,6 +9544,13 @@ checkPointerTypesForAssignment(Sema &S, QualType LHSType, QualType RHSType) {
     assert(lhptee->isFunctionType());
     return Sema::FunctionVoidPointer;
   }
+
+  if (!S.Diags.isIgnored(
+          diag::warn_typecheck_convert_incompatible_function_pointer_strict,
+          Loc) &&
+      RHSType->isFunctionPointerType() && LHSType->isFunctionPointerType() &&
+      !S.IsFunctionConversion(RHSType, LHSType, RHSType))
+    return Sema::IncompatibleFunctionPointerStrict;
 
   // C99 6.5.16.1p1 (constraint 3): both operands are pointers to qualified or
   // unqualified versions of compatible types, ...
@@ -9660,7 +9903,8 @@ Sema::CheckAssignmentConstraints(QualType LHSType, ExprResult &RHS,
         Kind = CK_NoOp;
       else
         Kind = CK_BitCast;
-      return checkPointerTypesForAssignment(*this, LHSType, RHSType);
+      return checkPointerTypesForAssignment(*this, LHSType, RHSType,
+                                            RHS.get()->getBeginLoc());
     }
 
     // int -> T*
@@ -13973,19 +14217,6 @@ QualType Sema::CheckAssignmentOperands(Expr *LHSExpr, ExprResult &RHS,
       //   type is deprecated unless the assignment is either a discarded-value
       //   expression or an unevaluated operand
       ExprEvalContexts.back().VolatileAssignmentLHSs.push_back(LHSExpr);
-    } else {
-      // C++20 [expr.ass]p6:
-      //   [Compound-assignment] expressions are deprecated if E1 has
-      //   volatile-qualified type and op is not one of the bitwise
-      //   operators |, &, ˆ.
-      switch (Opc) {
-      case BO_OrAssign:
-      case BO_AndAssign:
-      case BO_XorAssign:
-        break;
-      default:
-        Diag(Loc, diag::warn_deprecated_compound_assign_volatile) << LHSType;
-      }
     }
   }
 
@@ -15587,7 +15818,7 @@ ExprResult Sema::CreateBuiltinUnaryOp(SourceLocation OpLoc,
     }
   }
 
-  if (getLangOpts().HLSL) {
+  if (getLangOpts().HLSL && OpLoc.isValid()) {
     if (Opc == UO_AddrOf)
       return ExprError(Diag(OpLoc, diag::err_hlsl_operator_unsupported) << 0);
     if (Opc == UO_Deref)
@@ -16249,7 +16480,7 @@ void Sema::ActOnBlockArguments(SourceLocation CaretLoc, Declarator &ParamInfo,
     FunctionProtoType::ExtProtoInfo EPI;
     EPI.HasTrailingReturn = false;
     EPI.TypeQuals.addConst();
-    T = Context.getFunctionType(Context.DependentTy, None, EPI);
+    T = Context.getFunctionType(Context.DependentTy, std::nullopt, EPI);
     Sig = Context.getTrivialTypeSourceInfo(T);
   }
 
@@ -16399,10 +16630,10 @@ ExprResult Sema::ActOnBlockStmtExpr(SourceLocation CaretLoc,
     if (isa<FunctionNoProtoType>(FTy)) {
       FunctionProtoType::ExtProtoInfo EPI;
       EPI.ExtInfo = Ext;
-      BlockTy = Context.getFunctionType(RetTy, None, EPI);
+      BlockTy = Context.getFunctionType(RetTy, std::nullopt, EPI);
 
-    // Otherwise, if we don't need to change anything about the function type,
-    // preserve its sugar structure.
+      // Otherwise, if we don't need to change anything about the function type,
+      // preserve its sugar structure.
     } else if (FTy->getReturnType() == RetTy &&
                (!NoReturn || FTy->getNoReturnAttr())) {
       BlockTy = BSI->FunctionType;
@@ -16420,7 +16651,7 @@ ExprResult Sema::ActOnBlockStmtExpr(SourceLocation CaretLoc,
   } else {
     FunctionProtoType::ExtProtoInfo EPI;
     EPI.ExtInfo = FunctionType::ExtInfo().withNoReturn(NoReturn);
-    BlockTy = Context.getFunctionType(RetTy, None, EPI);
+    BlockTy = Context.getFunctionType(RetTy, std::nullopt, EPI);
   }
 
   DiagnoseUnusedParameters(BD->parameters());
@@ -16711,7 +16942,7 @@ ExprResult Sema::ActOnGNUNullExpr(SourceLocation TokenLoc) {
   // The type of __null will be int or long, depending on the size of
   // pointers on the target.
   QualType Ty;
-  unsigned pw = Context.getTargetInfo().getPointerWidth(0);
+  unsigned pw = Context.getTargetInfo().getPointerWidth(LangAS::Default);
   if (pw == Context.getTargetInfo().getIntWidth())
     Ty = Context.IntTy;
   else if (pw == Context.getTargetInfo().getLongWidth())
@@ -16946,6 +17177,12 @@ bool Sema::DiagnoseAssignmentResult(AssignConvertType ConvTy,
     } else {
       DiagKind = diag::ext_typecheck_convert_int_pointer;
     }
+    ConvHints.tryToFixConversion(SrcExpr, SrcType, DstType, *this);
+    MayHaveConvFixit = true;
+    break;
+  case IncompatibleFunctionPointerStrict:
+    DiagKind =
+        diag::warn_typecheck_convert_incompatible_function_pointer_strict;
     ConvHints.tryToFixConversion(SrcExpr, SrcType, DstType, *this);
     MayHaveConvFixit = true;
     break;
@@ -17539,6 +17776,7 @@ void Sema::CheckUnusedVolatileAssignment(Expr *E) {
 ExprResult Sema::CheckForImmediateInvocation(ExprResult E, FunctionDecl *Decl) {
   if (isUnevaluatedContext() || !E.isUsable() || !Decl ||
       !Decl->isConsteval() || isConstantEvaluated() ||
+      isCheckingDefaultArgumentOrInitializer() ||
       RebuildingImmediateInvocation || isImmediateFunctionContext())
     return E;
 
@@ -17584,8 +17822,14 @@ static void EvaluateAndDiagnoseImmediateInvocation(
       FD = Call->getConstructor();
     else
       llvm_unreachable("unhandled decl kind");
-    assert(FD->isConsteval());
+    assert(FD && FD->isConsteval());
     SemaRef.Diag(CE->getBeginLoc(), diag::err_invalid_consteval_call) << FD;
+    if (auto Context =
+            SemaRef.InnermostDeclarationWithDelayedImmediateInvocations()) {
+      SemaRef.Diag(Context->Loc, diag::note_invalid_consteval_initializer)
+          << Context->Decl;
+      SemaRef.Diag(Context->Decl->getBeginLoc(), diag::note_declared_at);
+    }
     for (auto &Note : Notes)
       SemaRef.Diag(Note.first, Note.second);
     return;
@@ -17695,7 +17939,7 @@ HandleImmediateInvocations(Sema &SemaRef,
 
     /// Prevent sema calls during the tree transform from adding pointers that
     /// are already in the sets.
-    llvm::SaveAndRestore<bool> DisableIITracking(
+    llvm::SaveAndRestore DisableIITracking(
         SemaRef.RebuildingImmediateInvocation, true);
 
     /// Prevent diagnostic during tree transfrom as they are duplicates
@@ -18168,6 +18412,16 @@ void Sema::MarkFunctionReferenced(SourceLocation Loc, FunctionDecl *Func,
         }
       }
     });
+  }
+
+  // If a constructor was defined in the context of a default parameter
+  // or of another default member initializer (ie a PotentiallyEvaluatedIfUsed
+  // context), its initializers may not be referenced yet.
+  if (CXXConstructorDecl *Constructor = dyn_cast<CXXConstructorDecl>(Func)) {
+    for (CXXCtorInitializer *Init : Constructor->inits()) {
+      if (Init->isInClassMemberInitializer())
+        MarkDeclarationsReferencedInExpr(Init->getInit());
+    }
   }
 
   // C++14 [except.spec]p17:
@@ -19598,7 +19852,10 @@ static void DoMarkVarDeclReferenced(
 
   switch (OdrUse) {
   case OdrUseContext::None:
-    assert((!E || isa<FunctionParmPackExpr>(E)) &&
+    // In some cases, a variable may not have been marked unevaluated, if it
+    // appears in a defaukt initializer.
+    assert((!E || isa<FunctionParmPackExpr>(E) ||
+            SemaRef.isUnevaluatedContext()) &&
            "missing non-odr-use marking for unevaluated decl ref");
     break;
 
@@ -19731,7 +19988,8 @@ void Sema::MarkDeclRefReferenced(DeclRefExpr *E, const Expr *Base) {
 
   if (auto *FD = dyn_cast<FunctionDecl>(E->getDecl()))
     if (!isUnevaluatedContext() && !isConstantEvaluated() &&
-        !isImmediateFunctionContext() && FD->isConsteval() &&
+        !isImmediateFunctionContext() &&
+        !isCheckingDefaultArgumentOrInitializer() && FD->isConsteval() &&
         !RebuildingImmediateInvocation && !FD->isDependentContext())
       ExprEvalContexts.back().ReferenceToConsteval.insert(E);
   MarkExprReferenced(*this, E->getLocation(), E->getDecl(), E, OdrUse,
@@ -19966,7 +20224,7 @@ bool Sema::DiagRuntimeBehavior(SourceLocation Loc, ArrayRef<const Stmt*> Stmts,
 bool Sema::DiagRuntimeBehavior(SourceLocation Loc, const Stmt *Statement,
                                const PartialDiagnostic &PD) {
   return DiagRuntimeBehavior(
-      Loc, Statement ? llvm::makeArrayRef(Statement) : llvm::None, PD);
+      Loc, Statement ? llvm::makeArrayRef(Statement) : std::nullopt, PD);
 }
 
 bool Sema::CheckCallReturnType(QualType ReturnType, SourceLocation Loc,
@@ -20890,7 +21148,7 @@ ExprResult Sema::ActOnObjCAvailabilityCheckExpr(
       });
     }
     if (Spec == AvailSpecs.end())
-      return None;
+      return std::nullopt;
     return Spec->getVersion();
   };
 

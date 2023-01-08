@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <optional>
 #include <unordered_map>
 
 #include "lldb/Core/FileSpecList.h"
@@ -820,9 +821,9 @@ UUID ObjectFileELF::GetUUID() {
   return m_uuid;
 }
 
-llvm::Optional<FileSpec> ObjectFileELF::GetDebugLink() {
+std::optional<FileSpec> ObjectFileELF::GetDebugLink() {
   if (m_gnu_debuglink_file.empty())
-    return llvm::None;
+    return std::nullopt;
   return FileSpec(m_gnu_debuglink_file);
 }
 
@@ -1766,22 +1767,22 @@ public:
     return llvm::formatv("{0}[{1}]", SegmentName, SegmentCount).str();
   }
 
-  llvm::Optional<VMRange> GetAddressInfo(const ELFProgramHeader &H) {
+  std::optional<VMRange> GetAddressInfo(const ELFProgramHeader &H) {
     if (H.p_memsz == 0) {
       LLDB_LOG(Log, "Ignoring zero-sized {0} segment. Corrupt object file?",
                SegmentName);
-      return llvm::None;
+      return std::nullopt;
     }
 
     if (Segments.overlaps(H.p_vaddr, H.p_vaddr + H.p_memsz)) {
       LLDB_LOG(Log, "Ignoring overlapping {0} segment. Corrupt object file?",
                SegmentName);
-      return llvm::None;
+      return std::nullopt;
     }
     return VMRange(H.p_vaddr, H.p_memsz);
   }
 
-  llvm::Optional<SectionAddressInfo> GetAddressInfo(const ELFSectionHeader &H) {
+  std::optional<SectionAddressInfo> GetAddressInfo(const ELFSectionHeader &H) {
     VMRange Range = GetVMRange(H);
     SectionSP Segment;
     auto It = Segments.find(Range.GetRangeBase());
@@ -1801,7 +1802,7 @@ public:
     if (Range.GetByteSize() > 0 &&
         Sections.overlaps(Range.GetRangeBase(), Range.GetRangeEnd())) {
       LLDB_LOG(Log, "Ignoring overlapping section. Corrupt object file?");
-      return llvm::None;
+      return std::nullopt;
     }
     if (Segment)
       Range.Slide(-Segment->GetFileAddress());

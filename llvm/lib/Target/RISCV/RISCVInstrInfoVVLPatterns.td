@@ -146,14 +146,15 @@ def riscv_vfcvt_rtz_xu_f_vl : SDNode<"RISCVISD::VFCVT_RTZ_XU_F_VL", SDT_RISCVFP2
 def riscv_sint_to_fp_vl : SDNode<"RISCVISD::SINT_TO_FP_VL", SDT_RISCVI2FPOp_VL>;
 def riscv_uint_to_fp_vl : SDNode<"RISCVISD::UINT_TO_FP_VL", SDT_RISCVI2FPOp_VL>;
 
-def SDT_RISCVVecCvtX2FOp_VL : SDTypeProfile<1, 4, [
+def SDT_RISCVVecCvtF2XOp_VL : SDTypeProfile<1, 4, [
   SDTCisInt<0>, SDTCisFP<1>, SDTCisSameNumEltsAs<0, 1>,
   SDTCVecEltisVT<2, i1>, SDTCisSameNumEltsAs<1, 2>, SDTCisVT<3, XLenVT>,
   SDTCisVT<4, XLenVT>
 ]>;
 
-def riscv_vfcvt_rm_x_f_vl : SDNode<"RISCVISD::VFCVT_RM_X_F_VL", SDT_RISCVVecCvtX2FOp_VL>;
+def riscv_vfcvt_rm_x_f_vl : SDNode<"RISCVISD::VFCVT_RM_X_F_VL", SDT_RISCVVecCvtF2XOp_VL>;
 def riscv_vfcvt_x_f_vl : SDNode<"RISCVISD::VFCVT_X_F_VL", SDT_RISCVFP2IOp_VL>;
+def riscv_vfround_noexcept_vl: SDNode<"RISCVISD::VFROUND_NOEXCEPT_VL", SDT_RISCVFPUnOp_VL>;
 
 def riscv_setcc_vl : SDNode<"RISCVISD::SETCC_VL",
                             SDTypeProfile<1, 6, [SDTCVecEltisVT<0, i1>,
@@ -221,6 +222,13 @@ def riscv_vmnot_vl : PatFrag<(ops node:$rs, node:$vl),
                              (riscv_vmxor_vl node:$rs, true_mask, node:$vl)>;
 
 def riscv_vcpop_vl : SDNode<"RISCVISD::VCPOP_VL",
+                            SDTypeProfile<1, 3, [SDTCisVT<0, XLenVT>,
+                                                 SDTCisVec<1>, SDTCisInt<1>,
+                                                 SDTCVecEltisVT<2, i1>,
+                                                 SDTCisSameNumEltsAs<1, 2>,
+                                                 SDTCisVT<3, XLenVT>]>>;
+
+def riscv_vfirst_vl : SDNode<"RISCVISD::VFIRST_VL",
                             SDTypeProfile<1, 3, [SDTCisVT<0, XLenVT>,
                                                  SDTCisVec<1>, SDTCisInt<1>,
                                                  SDTCVecEltisVT<2, i1>,
@@ -1626,6 +1634,13 @@ foreach vti = AllFloatVectors in {
                  vti.RegClass:$merge, vti.RegClass:$rs1,
                  vti.ScalarRegClass:$rs2, (vti.Mask V0), GPR:$vl, vti.Log2SEW,
                  TAIL_AGNOSTIC)>;
+
+  // Rounding without exception to implement nearbyint.
+  def : Pat<(riscv_vfround_noexcept_vl (vti.Vector vti.RegClass:$rs1),
+                                       (vti.Mask V0), VLOpFrag),
+            (!cast<Instruction>("PseudoVFROUND_NOEXCEPT_V_" # vti.LMul.MX #"_MASK")
+                  (vti.Vector (IMPLICIT_DEF)), vti.RegClass:$rs1,
+                  (vti.Mask V0), GPR:$vl, vti.Log2SEW, TA_MA)>;
 }
 
 foreach fvti = AllFloatVectors in {
@@ -1821,6 +1836,16 @@ foreach mti = AllMasks in {
                                     VLOpFrag)),
             (!cast<Instruction>("PseudoVCPOP_M_" # mti.BX # "_MASK")
                  VR:$rs2, (mti.Mask V0), GPR:$vl, mti.Log2SEW)>;
+
+  // 16.3 vfirst find-first-set mask bit
+  def : Pat<(XLenVT (riscv_vfirst_vl (mti.Mask VR:$rs2), (mti.Mask true_mask),
+                                    VLOpFrag)),
+            (!cast<Instruction>("PseudoVFIRST_M_" # mti.BX)
+                 VR:$rs2, GPR:$vl, mti.Log2SEW)>;
+  def : Pat<(XLenVT (riscv_vfirst_vl (mti.Mask VR:$rs2), (mti.Mask V0),
+                                    VLOpFrag)),
+            (!cast<Instruction>("PseudoVFIRST_M_" # mti.BX # "_MASK")
+                 VR:$rs2, (mti.Mask V0), GPR:$vl, mti.Log2SEW)>;
 }
 
 } // Predicates = [HasVInstructions]
@@ -1956,9 +1981,10 @@ def riscv_vid_vl : SDNode<"RISCVISD::VID_VL", SDTypeProfile<1, 2,
                           [SDTCisVec<0>, SDTCVecEltisVT<1, i1>,
                            SDTCisSameNumEltsAs<0, 1>, SDTCisVT<2, XLenVT>]>, []>;
 
-def SDTRVVSlide : SDTypeProfile<1, 5, [
+def SDTRVVSlide : SDTypeProfile<1, 6, [
   SDTCisVec<0>, SDTCisSameAs<1, 0>, SDTCisSameAs<2, 0>, SDTCisVT<3, XLenVT>,
-  SDTCVecEltisVT<4, i1>, SDTCisSameNumEltsAs<0, 4>, SDTCisVT<5, XLenVT>
+  SDTCVecEltisVT<4, i1>, SDTCisSameNumEltsAs<0, 4>, SDTCisVT<5, XLenVT>,
+  SDTCisVT<6, XLenVT>
 ]>;
 def SDTRVVSlide1 : SDTypeProfile<1, 5, [
   SDTCisVec<0>, SDTCisSameAs<1, 0>, SDTCisSameAs<2, 0>, SDTCisInt<0>,
@@ -2008,48 +2034,34 @@ foreach vti = !listconcat(AllIntegerVectors, AllFloatVectors) in {
   def : Pat<(vti.Vector (riscv_slideup_vl (vti.Vector vti.RegClass:$rs3),
                                           (vti.Vector vti.RegClass:$rs1),
                                           uimm5:$rs2, (vti.Mask true_mask),
-                                          VLOpFrag)),
+                                          VLOpFrag, (XLenVT timm:$policy))),
             (!cast<Instruction>("PseudoVSLIDEUP_VI_"#vti.LMul.MX)
                 vti.RegClass:$rs3, vti.RegClass:$rs1, uimm5:$rs2,
-                GPR:$vl, vti.Log2SEW, TAIL_UNDISTURBED_MASK_UNDISTURBED)>;
+                GPR:$vl, vti.Log2SEW, (XLenVT timm:$policy))>;
 
   def : Pat<(vti.Vector (riscv_slideup_vl (vti.Vector vti.RegClass:$rs3),
                                           (vti.Vector vti.RegClass:$rs1),
                                           GPR:$rs2, (vti.Mask true_mask),
-                                          VLOpFrag)),
+                                          VLOpFrag, (XLenVT timm:$policy))),
             (!cast<Instruction>("PseudoVSLIDEUP_VX_"#vti.LMul.MX)
                 vti.RegClass:$rs3, vti.RegClass:$rs1, GPR:$rs2,
-                GPR:$vl, vti.Log2SEW, TAIL_UNDISTURBED_MASK_UNDISTURBED)>;
+                GPR:$vl, vti.Log2SEW, (XLenVT timm:$policy))>;
 
   def : Pat<(vti.Vector (riscv_slidedown_vl (vti.Vector vti.RegClass:$rs3),
                                             (vti.Vector vti.RegClass:$rs1),
                                             uimm5:$rs2, (vti.Mask true_mask),
-                                            VLOpFrag)),
+                                            VLOpFrag, (XLenVT timm:$policy))),
             (!cast<Instruction>("PseudoVSLIDEDOWN_VI_"#vti.LMul.MX)
                 vti.RegClass:$rs3, vti.RegClass:$rs1, uimm5:$rs2,
-                GPR:$vl, vti.Log2SEW, TAIL_UNDISTURBED_MASK_UNDISTURBED)>;
-  def : Pat<(vti.Vector (riscv_slidedown_vl (vti.Vector undef),
-                                            (vti.Vector vti.RegClass:$rs1),
-                                            uimm5:$rs2, (vti.Mask true_mask),
-                                            VLOpFrag)),
-            (!cast<Instruction>("PseudoVSLIDEDOWN_VI_"#vti.LMul.MX)
-                (vti.Vector (IMPLICIT_DEF)), vti.RegClass:$rs1, uimm5:$rs2,
-                GPR:$vl, vti.Log2SEW, TA_MA)>;
+                GPR:$vl, vti.Log2SEW, (XLenVT timm:$policy))>;
 
   def : Pat<(vti.Vector (riscv_slidedown_vl (vti.Vector vti.RegClass:$rs3),
                                             (vti.Vector vti.RegClass:$rs1),
                                             GPR:$rs2, (vti.Mask true_mask),
-                                            VLOpFrag)),
+                                            VLOpFrag, (XLenVT timm:$policy))),
             (!cast<Instruction>("PseudoVSLIDEDOWN_VX_"#vti.LMul.MX)
                 vti.RegClass:$rs3, vti.RegClass:$rs1, GPR:$rs2,
-                GPR:$vl, vti.Log2SEW, TAIL_UNDISTURBED_MASK_UNDISTURBED)>;
-  def : Pat<(vti.Vector (riscv_slidedown_vl (vti.Vector undef),
-                                            (vti.Vector vti.RegClass:$rs1),
-                                            GPR:$rs2, (vti.Mask true_mask),
-                                            VLOpFrag)),
-            (!cast<Instruction>("PseudoVSLIDEDOWN_VX_"#vti.LMul.MX)
-                (vti.Vector (IMPLICIT_DEF)), vti.RegClass:$rs1, GPR:$rs2,
-                GPR:$vl, vti.Log2SEW, TA_MA)>;
+                GPR:$vl, vti.Log2SEW, (XLenVT timm:$policy))>;
 }
 
 } // Predicates = [HasVInstructions]

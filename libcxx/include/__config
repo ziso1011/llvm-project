@@ -196,6 +196,10 @@
 #    define __has_cpp_attribute(__x) 0
 #  endif
 
+#  ifndef __has_constexpr_builtin
+#    define __has_constexpr_builtin(x) 0
+#  endif
+
 // '__is_identifier' returns '0' if '__x' is a reserved identifier provided by
 // the compiler and '1' otherwise.
 #  ifndef __is_identifier
@@ -718,6 +722,15 @@ _LIBCPP_BEGIN_NAMESPACE_STD _LIBCPP_END_NAMESPACE_STD
 
 #  if defined(_LIBCPP_HAS_NO_LIBRARY_ALIGNED_ALLOCATION) || (!defined(__cpp_aligned_new) || __cpp_aligned_new < 201606)
 #    define _LIBCPP_HAS_NO_ALIGNED_ALLOCATION
+#  endif
+
+// It is not yet possible to use aligned_alloc() on all Apple platforms since
+// 10.15 was the first version to ship an implementation of aligned_alloc().
+#  if defined(__APPLE__)
+#    if (defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) &&                                                     \
+         __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 101500)
+#      define _LIBCPP_HAS_NO_C11_ALIGNED_ALLOC
+#    endif
 #  endif
 
 #  if defined(__APPLE__) || defined(__FreeBSD__)

@@ -70,6 +70,7 @@
 #include <cstdint>
 #include <cstring>
 #include <map>
+#include <optional>
 #include <type_traits>
 #include <utility>
 
@@ -364,13 +365,13 @@ void Module::SetUUID(const lldb_private::UUID &uuid) {
   }
 }
 
-llvm::Expected<TypeSystem &>
+llvm::Expected<TypeSystemSP>
 Module::GetTypeSystemForLanguage(LanguageType language) {
   return m_type_system_map.GetTypeSystemForLanguage(language, this, true);
 }
 
 void Module::ForEachTypeSystem(
-    llvm::function_ref<bool(TypeSystem *)> callback) {
+    llvm::function_ref<bool(lldb::TypeSystemSP)> callback) {
   m_type_system_map.ForEach(callback);
 }
 
@@ -419,8 +420,6 @@ void Module::DumpSymbolContext(Stream *s) {
 
 size_t Module::GetNumCompileUnits() {
   std::lock_guard<std::recursive_mutex> guard(m_mutex);
-  LLDB_SCOPED_TIMERF("Module::GetNumCompileUnits (module = %p)",
-                     static_cast<void *>(this));
   if (SymbolFile *symbols = GetSymbolFile())
     return symbols->GetNumCompileUnits();
   return 0;
@@ -598,7 +597,7 @@ uint32_t Module::ResolveSymbolContextsForFileSpec(
 
   if (SymbolFile *symbols = GetSymbolFile()) {
     // TODO: Handle SourceLocationSpec column information
-    SourceLocationSpec location_spec(file_spec, line, /*column=*/llvm::None,
+    SourceLocationSpec location_spec(file_spec, line, /*column=*/std::nullopt,
                                      check_inlines, /*exact_match=*/false);
 
     symbols->ResolveSymbolContext(location_spec, resolve_scope, sc_list);
@@ -939,7 +938,7 @@ void Module::FindAddressesForLine(const lldb::TargetSP target_sp,
   SearchFilterByModule filter(target_sp, m_file);
 
   // TODO: Handle SourceLocationSpec column information
-  SourceLocationSpec location_spec(file, line, /*column=*/llvm::None,
+  SourceLocationSpec location_spec(file, line, /*column=*/std::nullopt,
                                    /*check_inlines=*/true,
                                    /*exact_match=*/false);
   AddressResolverFileLine resolver(location_spec);
@@ -1127,7 +1126,7 @@ bool Module::FileHasChanged() const {
 }
 
 void Module::ReportWarningOptimization(
-    llvm::Optional<lldb::user_id_t> debugger_id) {
+    std::optional<lldb::user_id_t> debugger_id) {
   ConstString file_name = GetFileSpec().GetFilename();
   if (file_name.IsEmpty())
     return;
@@ -1141,7 +1140,7 @@ void Module::ReportWarningOptimization(
 }
 
 void Module::ReportWarningUnsupportedLanguage(
-    LanguageType language, llvm::Optional<lldb::user_id_t> debugger_id) {
+    LanguageType language, std::optional<lldb::user_id_t> debugger_id) {
   StreamString ss;
   ss << "This version of LLDB has no plugin for the language \""
      << Language::GetNameForLanguageType(language)
@@ -1636,8 +1635,7 @@ bool Module::FindSourceFile(const FileSpec &orig_spec,
   return false;
 }
 
-llvm::Optional<std::string>
-Module::RemapSourceFile(llvm::StringRef path) const {
+std::optional<std::string> Module::RemapSourceFile(llvm::StringRef path) const {
   std::lock_guard<std::recursive_mutex> guard(m_mutex);
   if (auto remapped = m_source_mappings.RemapPath(path))
     return remapped->GetPath();
@@ -1647,7 +1645,15 @@ Module::RemapSourceFile(llvm::StringRef path) const {
 void Module::RegisterXcodeSDK(llvm::StringRef sdk_name,
                               llvm::StringRef sysroot) {
   XcodeSDK sdk(sdk_name.str());
-  llvm::StringRef sdk_path(HostInfo::GetXcodeSDKPath(sdk));
+  auto sdk_path_or_err = HostInfo::GetXcodeSDKPath(sdk);
+
+  if (!sdk_path_or_err) {
+    Debugger::ReportError("Error while searching for Xcode SDK: " +
+                          toString(sdk_path_or_err.takeError()));
+    return;
+  }
+
+  auto sdk_path = *sdk_path_or_err;
   if (sdk_path.empty())
     return;
   // If the SDK changed for a previously registered source path, update it.

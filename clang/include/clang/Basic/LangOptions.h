@@ -110,9 +110,6 @@ public:
     /// Compiling a module from a module map.
     CMK_ModuleMap,
 
-    /// Compiling a module from a list of header files.
-    CMK_HeaderModule,
-
     /// Compiling a module header unit.
     CMK_HeaderUnit,
 
@@ -297,6 +294,8 @@ public:
     /// method instead.
     FEM_UnsetOnCommandLine = 3
   };
+
+  enum ExcessPrecisionKind { FPP_Standard, FPP_Fast, FPP_None };
 
   /// Possible exception handling behavior.
   enum class ExceptionHandlingKind { None, SjLj, WinEH, DwarfCFI, Wasm };

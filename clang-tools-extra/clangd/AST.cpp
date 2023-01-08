@@ -30,14 +30,13 @@
 #include "clang/Basic/Specifiers.h"
 #include "clang/Index/USRGeneration.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 #include <iterator>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -45,7 +44,7 @@ namespace clang {
 namespace clangd {
 
 namespace {
-llvm::Optional<llvm::ArrayRef<TemplateArgumentLoc>>
+std::optional<llvm::ArrayRef<TemplateArgumentLoc>>
 getTemplateSpecializationArgLocs(const NamedDecl &ND) {
   if (auto *Func = llvm::dyn_cast<FunctionDecl>(&ND)) {
     if (const ASTTemplateArgumentListInfo *Args =
@@ -63,9 +62,9 @@ getTemplateSpecializationArgLocs(const NamedDecl &ND) {
     if (auto *Args = Var->getTemplateArgsInfo())
       return Args->arguments();
   }
-  // We return None for ClassTemplateSpecializationDecls because it does not
-  // contain TemplateArgumentLoc information.
-  return llvm::None;
+  // We return std::nullopt for ClassTemplateSpecializationDecls because it does
+  // not contain TemplateArgumentLoc information.
+  return std::nullopt;
 }
 
 template <class T>
@@ -267,7 +266,7 @@ std::string printTemplateSpecializationArgs(const NamedDecl &ND) {
   std::string TemplateArgs;
   llvm::raw_string_ostream OS(TemplateArgs);
   PrintingPolicy Policy(ND.getASTContext().getLangOpts());
-  if (llvm::Optional<llvm::ArrayRef<TemplateArgumentLoc>> Args =
+  if (std::optional<llvm::ArrayRef<TemplateArgumentLoc>> Args =
           getTemplateSpecializationArgLocs(ND)) {
     printTemplateArgumentList(OS, *Args, Policy);
   } else if (auto *Cls = llvm::dyn_cast<ClassTemplateSpecializationDecl>(&ND)) {
@@ -564,14 +563,13 @@ public:
 };
 } // namespace
 
-llvm::Optional<QualType> getDeducedType(ASTContext &ASTCtx,
-                                        SourceLocation Loc) {
+std::optional<QualType> getDeducedType(ASTContext &ASTCtx, SourceLocation Loc) {
   if (!Loc.isValid())
     return {};
   DeducedTypeVisitor V(Loc);
   V.TraverseAST(ASTCtx);
   if (V.DeducedType.isNull())
-    return llvm::None;
+    return std::nullopt;
   return V.DeducedType;
 }
 
@@ -798,11 +796,11 @@ public:
     ArrayRef<const ParmVarDecl *> Tail;
     // If the parameters were resolved to another forwarding FunctionDecl, this
     // is it.
-    Optional<FunctionDecl *> PackTarget;
+    std::optional<FunctionDecl *> PackTarget;
   };
 
   // The output of this visitor
-  Optional<ForwardingInfo> Info;
+  std::optional<ForwardingInfo> Info;
 
 private:
   // inspects the given callee with the given args to check whether it
@@ -844,7 +842,7 @@ private:
 
   // Returns the beginning of the expanded pack represented by Parameters
   // in the given arguments, if it is there.
-  llvm::Optional<size_t> findPack(typename CallExpr::arg_range Args) {
+  std::optional<size_t> findPack(typename CallExpr::arg_range Args) {
     // find the argument directly referring to the first parameter
     assert(Parameters.size() <= static_cast<size_t>(llvm::size(Args)));
     for (auto Begin = Args.begin(), End = Args.end() - Parameters.size() + 1;
@@ -862,7 +860,7 @@ private:
         return std::distance(Args.begin(), Begin);
       }
     }
-    return llvm::None;
+    return std::nullopt;
   }
 
   static FunctionDecl *getCalleeDeclOrUniqueOverload(CallExpr *E) {
@@ -956,7 +954,7 @@ resolveForwardingParameters(const FunctionDecl *D, unsigned MaxDepth) {
         break;
       }
       // If we found something: Fill in non-pack parameters
-      auto Info = V.Info.value();
+      auto Info = *V.Info;
       HeadIt = std::copy(Info.Head.begin(), Info.Head.end(), HeadIt);
       TailIt = std::copy(Info.Tail.rbegin(), Info.Tail.rend(), TailIt);
       // Prepare next recursion level

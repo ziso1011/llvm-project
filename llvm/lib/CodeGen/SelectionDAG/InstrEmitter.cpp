@@ -81,9 +81,9 @@ static unsigned countOperands(SDNode *Node, unsigned NumExpUses,
 
 /// EmitCopyFromReg - Generate machine code for an CopyFromReg node or an
 /// implicit physical register output.
-void InstrEmitter::
-EmitCopyFromReg(SDNode *Node, unsigned ResNo, bool IsClone, bool IsCloned,
-                Register SrcReg, DenseMap<SDValue, Register> &VRBaseMap) {
+void InstrEmitter::EmitCopyFromReg(SDNode *Node, unsigned ResNo, bool IsClone,
+                                   Register SrcReg,
+                                   DenseMap<SDValue, Register> &VRBaseMap) {
   Register VRBase;
   if (SrcReg.isVirtual()) {
     // Just use the input register directly!
@@ -106,51 +106,50 @@ EmitCopyFromReg(SDNode *Node, unsigned ResNo, bool IsClone, bool IsCloned,
   if (TLI->isTypeLegal(VT))
     UseRC = TLI->getRegClassFor(VT, Node->isDivergent());
 
-  if (!IsClone && !IsCloned)
-    for (SDNode *User : Node->uses()) {
-      bool Match = true;
-      if (User->getOpcode() == ISD::CopyToReg &&
-          User->getOperand(2).getNode() == Node &&
-          User->getOperand(2).getResNo() == ResNo) {
-        Register DestReg = cast<RegisterSDNode>(User->getOperand(1))->getReg();
-        if (DestReg.isVirtual()) {
-          VRBase = DestReg;
-          Match = false;
-        } else if (DestReg != SrcReg)
-          Match = false;
-      } else {
-        for (unsigned i = 0, e = User->getNumOperands(); i != e; ++i) {
-          SDValue Op = User->getOperand(i);
-          if (Op.getNode() != Node || Op.getResNo() != ResNo)
-            continue;
-          MVT VT = Node->getSimpleValueType(Op.getResNo());
-          if (VT == MVT::Other || VT == MVT::Glue)
-            continue;
-          Match = false;
-          if (User->isMachineOpcode()) {
-            const MCInstrDesc &II = TII->get(User->getMachineOpcode());
-            const TargetRegisterClass *RC = nullptr;
-            if (i+II.getNumDefs() < II.getNumOperands()) {
-              RC = TRI->getAllocatableClass(
-                TII->getRegClass(II, i+II.getNumDefs(), TRI, *MF));
-            }
-            if (!UseRC)
-              UseRC = RC;
-            else if (RC) {
-              const TargetRegisterClass *ComRC =
+  for (SDNode *User : Node->uses()) {
+    bool Match = true;
+    if (User->getOpcode() == ISD::CopyToReg &&
+        User->getOperand(2).getNode() == Node &&
+        User->getOperand(2).getResNo() == ResNo) {
+      Register DestReg = cast<RegisterSDNode>(User->getOperand(1))->getReg();
+      if (DestReg.isVirtual()) {
+        VRBase = DestReg;
+        Match = false;
+      } else if (DestReg != SrcReg)
+        Match = false;
+    } else {
+      for (unsigned i = 0, e = User->getNumOperands(); i != e; ++i) {
+        SDValue Op = User->getOperand(i);
+        if (Op.getNode() != Node || Op.getResNo() != ResNo)
+          continue;
+        MVT VT = Node->getSimpleValueType(Op.getResNo());
+        if (VT == MVT::Other || VT == MVT::Glue)
+          continue;
+        Match = false;
+        if (User->isMachineOpcode()) {
+          const MCInstrDesc &II = TII->get(User->getMachineOpcode());
+          const TargetRegisterClass *RC = nullptr;
+          if (i + II.getNumDefs() < II.getNumOperands()) {
+            RC = TRI->getAllocatableClass(
+                TII->getRegClass(II, i + II.getNumDefs(), TRI, *MF));
+          }
+          if (!UseRC)
+            UseRC = RC;
+          else if (RC) {
+            const TargetRegisterClass *ComRC =
                 TRI->getCommonSubClass(UseRC, RC);
-              // If multiple uses expect disjoint register classes, we emit
-              // copies in AddRegisterOperand.
-              if (ComRC)
-                UseRC = ComRC;
-            }
+            // If multiple uses expect disjoint register classes, we emit
+            // copies in AddRegisterOperand.
+            if (ComRC)
+              UseRC = ComRC;
           }
         }
       }
-      MatchReg &= Match;
-      if (VRBase)
-        break;
     }
+    MatchReg &= Match;
+    if (VRBase)
+      break;
+  }
 
   const TargetRegisterClass *SrcRC = nullptr, *DstRC = nullptr;
   SrcRC = TRI->getMinimalPhysRegClass(SrcReg, VT);
@@ -768,7 +767,7 @@ InstrEmitter::EmitDbgInstrRef(SDDbgValue *SD,
   assert(!SD->isVariadic());
   SDDbgOperand DbgOperand = SD->getLocationOps()[0];
   MDNode *Var = SD->getVariable();
-  DIExpression *Expr = (DIExpression*)SD->getExpression();
+  const DIExpression *Expr = (DIExpression *)SD->getExpression();
   DebugLoc DL = SD->getDebugLoc();
   const MCInstrDesc &RefII = TII->get(TargetOpcode::DBG_INSTR_REF);
 
@@ -795,12 +794,12 @@ InstrEmitter::EmitDbgInstrRef(SDDbgValue *SD,
   // i.e., point the instruction at the vreg, and patch it up later in
   // MachineFunction::finalizeDebugInstrRefs.
   auto EmitHalfDoneInstrRef = [&](unsigned VReg) -> MachineInstr * {
-    auto MIB = BuildMI(*MF, DL, RefII);
-    MIB.addReg(VReg);
-    MIB.addImm(0);
-    MIB.addMetadata(Var);
-    MIB.addMetadata(Expr);
-    return MIB;
+    SmallVector<MachineOperand, 1> MOs({MachineOperand::CreateReg(
+        /* Reg */ VReg, /* isDef */ false, /* isImp */ false,
+        /* isKill */ false, /* isDead */ false,
+        /* isUndef */ false, /* isEarlyClobber */ false,
+        /* SubReg */ 0, /* isDebug */ true)});
+    return BuildMI(*MF, DL, RefII, false, MOs, Var, Expr);
   };
 
   // Try to find both the defined register and the instruction defining it.
@@ -843,8 +842,6 @@ InstrEmitter::EmitDbgInstrRef(SDDbgValue *SD,
   if (DefMI->isCopyLike() || TII->isCopyInstr(*DefMI))
     return EmitHalfDoneInstrRef(VReg);
 
-  auto MIB = BuildMI(*MF, DL, RefII);
-
   // Find the operand number which defines the specified VReg.
   unsigned OperandIdx = 0;
   for (const auto &MO : DefMI->operands()) {
@@ -854,13 +851,15 @@ InstrEmitter::EmitDbgInstrRef(SDDbgValue *SD,
   }
   assert(OperandIdx < DefMI->getNumOperands());
 
+  // Only convert Expr to variadic form when we're sure we're emitting a
+  // complete instruction reference.
+  if (!SD->isVariadic())
+    Expr = DIExpression::convertToVariadicExpression(Expr);
   // Make the DBG_INSTR_REF refer to that instruction, and that operand.
   unsigned InstrNum = DefMI->getDebugInstrNum();
-  MIB.addImm(InstrNum);
-  MIB.addImm(OperandIdx);
-  MIB.addMetadata(Var);
-  MIB.addMetadata(Expr);
-  return &*MIB;
+  SmallVector<MachineOperand, 1> MOs(
+      {MachineOperand::CreateDbgInstrRef(InstrNum, OperandIdx)});
+  return BuildMI(*MF, DL, RefII, false, MOs, Var, Expr);
 }
 
 MachineInstr *InstrEmitter::EmitDbgNoLocation(SDDbgValue *SD) {
@@ -1096,7 +1095,7 @@ EmitMachineNode(SDNode *Node, bool IsClone, bool IsCloned,
         continue;
       // This implicitly defined physreg has a use.
       UsedRegs.push_back(Reg);
-      EmitCopyFromReg(Node, i, IsClone, IsCloned, Reg, VRBaseMap);
+      EmitCopyFromReg(Node, i, IsClone, Reg, VRBaseMap);
     }
   }
 
@@ -1191,7 +1190,7 @@ EmitSpecialNode(SDNode *Node, bool IsClone, bool IsCloned,
   }
   case ISD::CopyFromReg: {
     unsigned SrcReg = cast<RegisterSDNode>(Node->getOperand(1))->getReg();
-    EmitCopyFromReg(Node, 0, IsClone, IsCloned, SrcReg, VRBaseMap);
+    EmitCopyFromReg(Node, 0, IsClone, SrcReg, VRBaseMap);
     break;
   }
   case ISD::EH_LABEL:

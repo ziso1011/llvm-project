@@ -564,6 +564,16 @@ def StdC : StandardSpec<"stdc"> {
                ArgSpec<FILEPtr>]
           >,
           FunctionSpec<
+              "ftell",
+              RetValSpec<LongType>,
+              [ArgSpec<FILEPtr>]
+          >,
+          FunctionSpec<
+              "getc",
+              RetValSpec<IntType>,
+              [ArgSpec<FILEPtr>]
+          >,
+          FunctionSpec<
               "putc",
               RetValSpec<IntType>,
               [ArgSpec<IntType>,
@@ -622,6 +632,26 @@ def StdC : StandardSpec<"stdc"> {
               "setvbuf",
               RetValSpec<IntType>,
               [ArgSpec<FILERestrictedPtr>, ArgSpec<CharRestrictedPtr>, ArgSpec<IntType>, ArgSpec<SizeTType>]
+          >,
+          FunctionSpec<
+              "sscanf",
+              RetValSpec<IntType>,
+              [ArgSpec<ConstCharRestrictedPtr>,
+               ArgSpec<ConstCharRestrictedPtr>,
+               ArgSpec<VarArgType>]
+          >,
+          FunctionSpec<
+              "scanf",
+              RetValSpec<IntType>,
+              [ArgSpec<ConstCharRestrictedPtr>,
+               ArgSpec<VarArgType>]
+          >,
+          FunctionSpec<
+              "fscanf",
+              RetValSpec<IntType>,
+              [ArgSpec<FILERestrictedPtr>,
+               ArgSpec<ConstCharRestrictedPtr>,
+               ArgSpec<VarArgType>]
           >,
           FunctionSpec<
               "sprintf",

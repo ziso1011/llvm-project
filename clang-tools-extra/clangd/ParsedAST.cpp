@@ -50,6 +50,7 @@
 #include "llvm/ADT/StringRef.h"
 #include <algorithm>
 #include <memory>
+#include <optional>
 #include <vector>
 
 // Force the linker to link in Clang-tidy modules.
@@ -171,7 +172,7 @@ private:
 
   void replay() {
     for (const auto &Inc : Includes) {
-      llvm::Optional<FileEntryRef> File;
+      OptionalFileEntryRef File;
       if (Inc.Resolved != "")
         File = expectedToOptional(SM.getFileManager().getFileRef(Inc.Resolved));
 
@@ -338,7 +339,7 @@ void applyWarningOptions(llvm::ArrayRef<std::string> ExtraArgs,
 
 } // namespace
 
-llvm::Optional<ParsedAST>
+std::optional<ParsedAST>
 ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
                  std::unique_ptr<clang::CompilerInvocation> CI,
                  llvm::ArrayRef<Diag> CompilerInvocationDiags,
@@ -375,7 +376,7 @@ ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
                        [&](const auto &L) { L->sawDiagnostic(D, Diag); });
       });
 
-  llvm::Optional<PreamblePatch> Patch;
+  std::optional<PreamblePatch> Patch;
   bool PreserveDiags = true;
   // We might use an ignoring diagnostic consumer if they are going to be
   // dropped later on to not pay for extra latency by processing them.
@@ -399,7 +400,7 @@ ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
     elog("Failed to prepare a compiler instance: {0}",
          !Diags.empty() ? static_cast<DiagBase &>(Diags.back()).Message
                         : "unknown error");
-    return None;
+    return std::nullopt;
   }
   tidy::ClangTidyOptions ClangTidyOpts;
   if (PreserveDiags) {
@@ -443,7 +444,7 @@ ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
   if (!Action->BeginSourceFile(*Clang, MainInput)) {
     log("BeginSourceFile() failed when building AST for {0}",
         MainInput.getFile());
-    return None;
+    return std::nullopt;
   }
   // If we saw an include guard in the preamble section of the main file,
   // mark the main-file as include-guarded.
@@ -464,8 +465,10 @@ ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
   // In practice almost all checks work well without modifications.
   std::vector<std::unique_ptr<tidy::ClangTidyCheck>> CTChecks;
   ast_matchers::MatchFinder CTFinder;
-  llvm::Optional<tidy::ClangTidyContext> CTContext;
-  llvm::Optional<IncludeFixer> FixIncludes;
+  std::optional<tidy::ClangTidyContext> CTContext;
+  // Must outlive FixIncludes.
+  auto BuildDir = VFS->getCurrentWorkingDirectory();
+  std::optional<IncludeFixer> FixIncludes;
   llvm::DenseMap<diag::kind, DiagnosticsEngine::Level> OverriddenSeverity;
   // No need to run clang-tidy or IncludeFixerif we are not going to surface
   // diagnostics.
@@ -480,7 +483,7 @@ ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
     CTContext->setASTContext(&Clang->getASTContext());
     CTContext->setCurrentFile(Filename);
     CTContext->setSelfContainedDiags(true);
-    CTChecks = CTFactories.createChecksForLanguage(CTContext.getPointer());
+    CTChecks = CTFactories.createChecksForLanguage(&*CTContext);
     Preprocessor *PP = &Clang->getPreprocessor();
     for (const auto &Check : CTChecks) {
       Check->registerPPCallbacks(Clang->getSourceManager(), PP, PP);
@@ -551,7 +554,6 @@ ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
 
     // Add IncludeFixer which can recover diagnostics caused by missing includes
     // (e.g. incomplete type) and attach include insertion fixes to diagnostics.
-    auto BuildDir = VFS->getCurrentWorkingDirectory();
     if (Inputs.Index && !BuildDir.getError()) {
       auto Style =
           getFormatStyleForFile(Filename, Inputs.Contents, *Inputs.TFS);
@@ -651,7 +653,7 @@ ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
   // CompilerInstance won't run this callback, do it directly.
   ASTDiags.EndSourceFile();
 
-  llvm::Optional<std::vector<Diag>> Diags;
+  std::optional<std::vector<Diag>> Diags;
   // FIXME: Also skip generation of diagnostics alltogether to speed up ast
   // builds when we are patching a stale preamble.
   if (PreserveDiags) {
@@ -662,7 +664,7 @@ ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
                     Preamble->Diags.end());
     // Finally, add diagnostics coming from the AST.
     {
-      std::vector<Diag> D = ASTDiags.take(CTContext.getPointer());
+      std::vector<Diag> D = ASTDiags.take(&*CTContext);
       Diags->insert(Diags->end(), D.begin(), D.end());
     }
   }
@@ -678,7 +680,7 @@ ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
                          make_move_iterator(UnusedHeadersDiags.begin()),
                          make_move_iterator(UnusedHeadersDiags.end()));
   }
-  return Result;
+  return std::move(Result);
 }
 
 ParsedAST::ParsedAST(ParsedAST &&Other) = default;
@@ -768,7 +770,7 @@ ParsedAST::ParsedAST(PathRef TUPath, llvm::StringRef Version,
                      syntax::TokenBuffer Tokens, MainFileMacros Macros,
                      std::vector<PragmaMark> Marks,
                      std::vector<Decl *> LocalTopLevelDecls,
-                     llvm::Optional<std::vector<Diag>> Diags,
+                     std::optional<std::vector<Diag>> Diags,
                      IncludeStructure Includes, CanonicalIncludes CanonIncludes)
     : TUPath(TUPath), Version(Version), Preamble(std::move(Preamble)),
       Clang(std::move(Clang)), Action(std::move(Action)),
@@ -781,9 +783,9 @@ ParsedAST::ParsedAST(PathRef TUPath, llvm::StringRef Version,
   assert(this->Action);
 }
 
-llvm::Optional<llvm::StringRef> ParsedAST::preambleVersion() const {
+std::optional<llvm::StringRef> ParsedAST::preambleVersion() const {
   if (!Preamble)
-    return llvm::None;
+    return std::nullopt;
   return llvm::StringRef(Preamble->Version);
 }
 
