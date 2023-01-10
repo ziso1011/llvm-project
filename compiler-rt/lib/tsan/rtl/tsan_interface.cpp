@@ -15,6 +15,7 @@
 #include "tsan_rtl.h"
 #include "sanitizer_common/sanitizer_internal_defs.h"
 #include "sanitizer_common/sanitizer_ptrauth.h"
+#include "stdio.h"
 
 #define CALLERPC ((uptr)__builtin_return_address(0))
 
@@ -84,6 +85,10 @@ void __tsan_set_fiber_name(void *fiber, const char *name) {
 }  // extern "C"
 
 void __tsan_acquire(void *addr) {
+  FILE *log_file = fopen("tsan.log", "a");
+
+  fprintf(log_file, "%s\n", "TEST");
+  fclose(log_file);
   Acquire(cur_thread(), CALLERPC, (uptr)addr);
 }
 

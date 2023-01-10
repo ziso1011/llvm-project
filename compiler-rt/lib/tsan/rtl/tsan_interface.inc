@@ -13,80 +13,99 @@
 #include "sanitizer_common/sanitizer_ptrauth.h"
 #include "tsan_interface.h"
 #include "tsan_rtl.h"
+#include "log.h"
 
 #define CALLERPC ((uptr)__builtin_return_address(0))
 
 using namespace __tsan;
 
 void __tsan_read1(void *addr) {
+  log(addr, "read1");
   MemoryAccess(cur_thread(), CALLERPC, (uptr)addr, 1, kAccessRead);
 }
 
 void __tsan_read2(void *addr) {
+  log(addr, "read2");
   MemoryAccess(cur_thread(), CALLERPC, (uptr)addr, 2, kAccessRead);
 }
 
 void __tsan_read4(void *addr) {
+  log(addr, "read4");
   MemoryAccess(cur_thread(), CALLERPC, (uptr)addr, 4, kAccessRead);
 }
 
 void __tsan_read8(void *addr) {
+  log(addr, "read8");
   MemoryAccess(cur_thread(), CALLERPC, (uptr)addr, 8, kAccessRead);
 }
 
 void __tsan_read16(void *addr) {
+  log(addr, "read16");
   MemoryAccess16(cur_thread(), CALLERPC, (uptr)addr, kAccessRead);
 }
 
 void __tsan_write1(void *addr) {
+  log(addr, "write1");
   MemoryAccess(cur_thread(), CALLERPC, (uptr)addr, 1, kAccessWrite);
 }
 
 void __tsan_write2(void *addr) {
+  log(addr, "write2");
   MemoryAccess(cur_thread(), CALLERPC, (uptr)addr, 2, kAccessWrite);
 }
 
 void __tsan_write4(void *addr) {
+  log(addr, "write4");
   MemoryAccess(cur_thread(), CALLERPC, (uptr)addr, 4, kAccessWrite);
 }
 
 void __tsan_write8(void *addr) {
+  log(addr, "write8");
   MemoryAccess(cur_thread(), CALLERPC, (uptr)addr, 8, kAccessWrite);
 }
 
 void __tsan_write16(void *addr) {
+  log(addr, "write16");
   MemoryAccess16(cur_thread(), CALLERPC, (uptr)addr, kAccessWrite);
 }
 
 void __tsan_read1_pc(void *addr, void *pc) {
+  log(addr, "read1_pc");
   MemoryAccess(cur_thread(), STRIP_PAC_PC(pc), (uptr)addr, 1, kAccessRead | kAccessExternalPC);
 }
 
 void __tsan_read2_pc(void *addr, void *pc) {
+  log(addr, "read2_pc");
   MemoryAccess(cur_thread(), STRIP_PAC_PC(pc), (uptr)addr, 2, kAccessRead | kAccessExternalPC);
 }
 
 void __tsan_read4_pc(void *addr, void *pc) {
+  log(addr, "read4_pc");
   MemoryAccess(cur_thread(), STRIP_PAC_PC(pc), (uptr)addr, 4, kAccessRead | kAccessExternalPC);
 }
 
 void __tsan_read8_pc(void *addr, void *pc) {
+  log(addr, "read8_pc");
   MemoryAccess(cur_thread(), STRIP_PAC_PC(pc), (uptr)addr, 8, kAccessRead | kAccessExternalPC);
 }
 
 void __tsan_write1_pc(void *addr, void *pc) {
+  log(addr, "write1_pc");
   MemoryAccess(cur_thread(), STRIP_PAC_PC(pc), (uptr)addr, 1, kAccessWrite | kAccessExternalPC);
 }
 
 void __tsan_write2_pc(void *addr, void *pc) {
+  log(addr, "write2_pc");
   MemoryAccess(cur_thread(), STRIP_PAC_PC(pc), (uptr)addr, 2, kAccessWrite | kAccessExternalPC);
 }
 
 void __tsan_write4_pc(void *addr, void *pc) {
+  log(addr, "write4_pc");
   MemoryAccess(cur_thread(), STRIP_PAC_PC(pc), (uptr)addr, 4, kAccessWrite | kAccessExternalPC);
 }
 
 void __tsan_write8_pc(void *addr, void *pc) {
+  log(addr, "write8_pc");
   MemoryAccess(cur_thread(), STRIP_PAC_PC(pc), (uptr)addr, 8, kAccessWrite | kAccessExternalPC);
 }
 
