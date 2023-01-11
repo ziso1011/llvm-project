@@ -19,6 +19,7 @@
 #include "tsan_report.h"
 #include "tsan_symbolize.h"
 #include "tsan_platform.h"
+#include "log.h"
 
 namespace __tsan {
 
@@ -342,6 +343,7 @@ void MutexReadUnlock(ThreadState *thr, uptr pc, uptr addr) {
         }
       }
       if (!thr->ignore_sync) {
+        log(0, "Release");
         thr->clock.Release(&s->read_clock);
         released = true;
       }
