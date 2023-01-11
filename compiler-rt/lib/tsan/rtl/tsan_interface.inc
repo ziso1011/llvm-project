@@ -110,26 +110,32 @@ void __tsan_write8_pc(void *addr, void *pc) {
 }
 
 ALWAYS_INLINE USED void __tsan_unaligned_read2(const void *addr) {
+  log(addr, "unaligned_read2");
   UnalignedMemoryAccess(cur_thread(), CALLERPC, (uptr)addr, 2, kAccessRead);
 }
 
 ALWAYS_INLINE USED void __tsan_unaligned_read4(const void *addr) {
+  log(addr, "unaligned_read4");
   UnalignedMemoryAccess(cur_thread(), CALLERPC, (uptr)addr, 4, kAccessRead);
 }
 
 ALWAYS_INLINE USED void __tsan_unaligned_read8(const void *addr) {
+  log(addr, "unaligned_read8");
   UnalignedMemoryAccess(cur_thread(), CALLERPC, (uptr)addr, 8, kAccessRead);
 }
 
 ALWAYS_INLINE USED void __tsan_unaligned_write2(void *addr) {
+  log(addr, "unaligned_write2");
   UnalignedMemoryAccess(cur_thread(), CALLERPC, (uptr)addr, 2, kAccessWrite);
 }
 
 ALWAYS_INLINE USED void __tsan_unaligned_write4(void *addr) {
+  log(addr, "unaligned_write4");
   UnalignedMemoryAccess(cur_thread(), CALLERPC, (uptr)addr, 4, kAccessWrite);
 }
 
 ALWAYS_INLINE USED void __tsan_unaligned_write8(void *addr) {
+  log(addr, "unaligned_write8");
   UnalignedMemoryAccess(cur_thread(), CALLERPC, (uptr)addr, 8, kAccessWrite);
 }
 
