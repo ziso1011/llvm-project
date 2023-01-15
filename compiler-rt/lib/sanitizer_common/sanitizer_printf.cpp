@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <stdarg.h>
+// #include <pthread.h>
 
 #if SANITIZER_WINDOWS && defined(_MSC_VER) && _MSC_VER < 1800 &&               \
       !defined(va_copy)
@@ -243,7 +244,6 @@ static void CallPrintfAndReportCallback(const char *str) {
   if (PrintfAndReportCallback)
     PrintfAndReportCallback(str);
 }
-
 static void NOINLINE SharedPrintfCodeNoBuffer(bool append_pid,
                                               char *local_buffer,
                                               int buffer_size,
@@ -310,10 +310,23 @@ static void NOINLINE SharedPrintfCode(bool append_pid, const char *format,
                            format, args);
 }
 
+// FILE* log_file = 0;
+// pthread_mutex_t lock;
 void Printf(const char *format, ...) {
   va_list args;
   va_start(args, format);
   SharedPrintfCode(false, format, args);
+
+  // pthread_mutex_lock(&lock);
+  // log_file = fopen("tsan.log", "a");
+  // if (log_file != NULL) {
+  //   char buffer[500];
+  //   sprintf(buffer, format, args);
+  //   fprintf(log_file, buffer);
+  //   fclose(log_file);
+  // }
+  // pthread_mutex_unlock(&lock);
+
   va_end(args);
 }
 

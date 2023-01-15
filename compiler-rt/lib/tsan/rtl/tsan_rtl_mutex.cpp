@@ -343,7 +343,7 @@ void MutexReadUnlock(ThreadState *thr, uptr pc, uptr addr) {
         }
       }
       if (!thr->ignore_sync) {
-        log(0, "Release");
+        Printf("Release");
         thr->clock.Release(&s->read_clock);
         released = true;
       }
