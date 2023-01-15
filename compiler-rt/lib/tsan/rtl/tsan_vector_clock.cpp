@@ -13,6 +13,7 @@
 
 #include "sanitizer_common/sanitizer_placement_new.h"
 #include "tsan_mman.h"
+#include "tsan_platform.h"
 
 namespace __tsan {
 
@@ -34,6 +35,7 @@ void VectorClock::Reset() {
 }
 
 void VectorClock::Acquire(const VectorClock* src) {
+  // Report("Acquire Vector Clock\n");
   if (!src)
     return;
 #if !TSAN_VECTORIZE
@@ -52,17 +54,20 @@ void VectorClock::Acquire(const VectorClock* src) {
 }
 
 static VectorClock* AllocClock(VectorClock** dstp) {
+  // Report("Allocate Vector Clock\n");
   if (UNLIKELY(!*dstp))
     *dstp = New<VectorClock>();
   return *dstp;
 }
 
 void VectorClock::Release(VectorClock** dstp) const {
+  // Report("Release Vector Clock\n");
   VectorClock* dst = AllocClock(dstp);
   dst->Acquire(this);
 }
 
 void VectorClock::ReleaseStore(VectorClock** dstp) const {
+  // Report("Release Store Vector Clock\n");
   VectorClock* dst = AllocClock(dstp);
   *dst = *this;
 }
@@ -83,6 +88,7 @@ VectorClock& VectorClock::operator=(const VectorClock& other) {
 }
 
 void VectorClock::ReleaseStoreAcquire(VectorClock** dstp) {
+  // Report("Release Store Acquire Vector Clock\n");
   VectorClock* dst = AllocClock(dstp);
 #if !TSAN_VECTORIZE
   for (uptr i = 0; i < kThreadSlotCount; i++) {
@@ -104,6 +110,7 @@ void VectorClock::ReleaseStoreAcquire(VectorClock** dstp) {
 }
 
 void VectorClock::ReleaseAcquire(VectorClock** dstp) {
+  // Report("Release Acquire Vector Clock\n");
   VectorClock* dst = AllocClock(dstp);
 #if !TSAN_VECTORIZE
   for (uptr i = 0; i < kThreadSlotCount; i++) {

@@ -22,6 +22,7 @@ class VectorClock {
   VectorClock();
 
   Epoch Get(Sid sid) const;
+  // Epoch* GetAll() const;
   void Set(Sid sid, Epoch v);
 
   void Reset();
@@ -33,13 +34,16 @@ class VectorClock {
 
   VectorClock& operator=(const VectorClock& other);
 
- private:
   Epoch clk_[kThreadSlotCount] VECTOR_ALIGNED;
 };
 
 ALWAYS_INLINE Epoch VectorClock::Get(Sid sid) const {
   return clk_[static_cast<u8>(sid)];
 }
+
+// ALWAYS_INLINE Epoch * VectorClock::GetAll() const {
+//   return clk_;
+// }
 
 ALWAYS_INLINE void VectorClock::Set(Sid sid, Epoch v) {
   DCHECK_GE(v, clk_[static_cast<u8>(sid)]);

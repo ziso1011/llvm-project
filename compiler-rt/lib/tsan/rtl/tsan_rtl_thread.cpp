@@ -16,6 +16,7 @@
 #include "tsan_platform.h"
 #include "tsan_report.h"
 #include "tsan_sync.h"
+#include "log.h"
 
 namespace __tsan {
 
@@ -149,13 +150,26 @@ struct OnStartedArgs {
   uptr tls_size;
 };
 
+void PrintVectorClock(__tsan::Context* ctx, ThreadState* thr) {
+    uptr nthread, nlive;
+    ctx->thread_registry.GetNumberOfThreads(&nthread, &nlive);
+    Printf("Vector clock: [ ");
+    for (int i = 0; i < nthread; ++i) {
+        Printf("%d ", (int)thr->clock.clk_[i]);
+    }
+    Printf("]\n");
+}
+
 void ThreadStart(ThreadState *thr, Tid tid, tid_t os_id,
                  ThreadType thread_type) {
   ctx->thread_registry.StartThread(tid, os_id, thread_type, thr);
   if (!thr->ignore_sync) {
     SlotAttachAndLock(thr);
-    if (thr->tctx->sync_epoch == ctx->global_epoch)
-      thr->clock.Acquire(thr->tctx->sync);
+    if (thr->tctx->sync_epoch == ctx->global_epoch) {
+        Printf("Thread with thread slotID %d started\n", thr->fast_state.sid());
+        thr->clock.Acquire(thr->tctx->sync);
+        PrintVectorClock(ctx, thr);
+      }
     SlotUnlock(thr);
   }
   Free(thr->tctx->sync);
