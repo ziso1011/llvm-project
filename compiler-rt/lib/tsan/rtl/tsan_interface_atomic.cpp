@@ -239,6 +239,7 @@ static T AtomicLoad(ThreadState *thr, uptr pc, const volatile T *a, morder mo) {
     SlotLocker locker(thr);
     ReadLock lock(&s->mtx);
     thr->clock.Acquire(s->clock);
+
     Printf("Atomic Load");
     PrintVectorClock(ctx, thr);
     // Re-read under sync mutex because we need a consistent snapshot
@@ -279,6 +280,8 @@ static void AtomicStore(ThreadState *thr, uptr pc, volatile T *a, T v,
     auto s = ctx->metamap.GetSyncOrCreate(thr, pc, (uptr)a, false);
     Lock lock(&s->mtx);
     thr->clock.ReleaseStore(&s->clock);
+    Printf("AtomicStore (Clock ReleaseStore)");
+    PrintVectorClock(ctx, thr);
     NoTsanAtomicStore(a, v, mo);
   }
   IncrementEpoch(thr);

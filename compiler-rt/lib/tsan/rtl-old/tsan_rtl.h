@@ -46,6 +46,7 @@
 #include "tsan_stack_trace.h"
 #include "tsan_sync.h"
 #include "tsan_trace.h"
+#include "log.h"
 
 #if SANITIZER_WORDSIZE != 64
 # error "ThreadSanitizer is supported only on 64-bit platforms"

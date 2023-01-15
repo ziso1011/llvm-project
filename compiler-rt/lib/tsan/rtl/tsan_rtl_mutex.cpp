@@ -241,6 +241,8 @@ int MutexUnlock(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
           s->owner_tid = kInvalidTid;
           if (!thr->ignore_sync) {
             thr->clock.ReleaseStore(&s->clock);
+            Printf("MutexUnlock (Clock ReleaseStore)");
+            PrintVectorClock(ctx, thr);
             released = true;
           }
         }
@@ -471,6 +473,9 @@ void Release(ThreadState *thr, uptr pc, uptr addr) {
     auto s = ctx->metamap.GetSyncOrCreate(thr, pc, addr, false);
     Lock lock(&s->mtx);
     thr->clock.Release(&s->clock);
+
+    Printf("Mutex Release (Clock Release)");
+    PrintVectorClock(ctx, thr);
   }
   IncrementEpoch(thr);
 }
@@ -484,6 +489,9 @@ void ReleaseStore(ThreadState *thr, uptr pc, uptr addr) {
     auto s = ctx->metamap.GetSyncOrCreate(thr, pc, addr, false);
     Lock lock(&s->mtx);
     thr->clock.ReleaseStore(&s->clock);
+
+    Printf("Mutex ReleaseStore (Clock ReleaseStore)");
+    PrintVectorClock(ctx, thr);
   }
   IncrementEpoch(thr);
 }
@@ -497,6 +505,9 @@ void ReleaseStoreAcquire(ThreadState *thr, uptr pc, uptr addr) {
     auto s = ctx->metamap.GetSyncOrCreate(thr, pc, addr, false);
     Lock lock(&s->mtx);
     thr->clock.ReleaseStoreAcquire(&s->clock);
+
+    Printf("Mutex ReleaseStoreAcquire (Clock ReleaseStoreAcquire)");
+    PrintVectorClock(ctx, thr);
   }
   IncrementEpoch(thr);
 }

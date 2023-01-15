@@ -124,6 +124,7 @@ Tid ThreadCreate(ThreadState *thr, uptr pc, uptr uid, bool detached) {
     if (!thr->ignore_sync) {
       SlotLocker locker(thr);
       thr->clock.ReleaseStore(&arg.sync);
+      
       arg.sync_epoch = ctx->global_epoch;
       IncrementEpoch(thr);
     }

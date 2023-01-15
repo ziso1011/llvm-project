@@ -299,6 +299,9 @@ void SlotAttachAndLock(ThreadState* thr) {
   CHECK(!thr->slot);
   slot->thr = thr;
   thr->slot = slot;
+
+  // TODO
+  // Increment epoch
   Epoch epoch = EpochInc(slot->epoch());
   CHECK(!EpochOverflow(epoch));
   slot->SetEpoch(epoch);
@@ -312,6 +315,9 @@ void SlotAttachAndLock(ThreadState* thr) {
     thr->last_sleep_clock.Reset();
 #endif
   }
+
+  // TODO
+  // Update vector clock to new epoch
   thr->clock.Set(slot->sid, epoch);
   slot->journal.PushBack({thr->tid, epoch});
 }
@@ -831,6 +837,7 @@ void ForkBefore(ThreadState* thr, uptr pc) SANITIZER_NO_THREAD_SAFETY_ANALYSIS {
   __tsan_test_only_on_fork();
 }
 
+
 static void ForkAfter(ThreadState* thr) SANITIZER_NO_THREAD_SAFETY_ANALYSIS {
   thr->suppress_reports--;  // Enabled in ForkBefore.
   thr->ignore_interceptors--;
@@ -840,6 +847,8 @@ static void ForkAfter(ThreadState* thr) SANITIZER_NO_THREAD_SAFETY_ANALYSIS {
   ctx->slot_mtx.Unlock();
   ctx->thread_registry.Unlock();
   for (auto& slot : ctx->slots) slot.mtx.Unlock();
+  
+  // Increase vector clock (TODO)
   SlotAttachAndLock(thr);
   SlotUnlock(thr);
   GlobalProcessorUnlock();
