@@ -19,6 +19,7 @@
 #include "tsan_report.h"
 #include "tsan_symbolize.h"
 #include "tsan_platform.h"
+#include "log.h"
 
 namespace __tsan {
 
@@ -492,6 +493,8 @@ void AcquireImpl(ThreadState *thr, uptr pc, SyncClock *c) {
     return;
   thr->clock.set(thr->fast_state.epoch());
   thr->clock.acquire(&thr->proc()->clock_cache, c);
+  Printf("Acquire mutex");
+  PrintVectorClock(ctx, thr);
 }
 
 void ReleaseStoreAcquireImpl(ThreadState *thr, uptr pc, SyncClock *c) {

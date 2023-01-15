@@ -24,6 +24,7 @@
 #include "tsan_flags.h"
 #include "tsan_interface.h"
 #include "tsan_rtl.h"
+#include "log.h"
 
 using namespace __tsan;
 
@@ -238,6 +239,8 @@ static T AtomicLoad(ThreadState *thr, uptr pc, const volatile T *a, morder mo) {
     SlotLocker locker(thr);
     ReadLock lock(&s->mtx);
     thr->clock.Acquire(s->clock);
+    Printf("Atomic Load");
+    PrintVectorClock(ctx, thr);
     // Re-read under sync mutex because we need a consistent snapshot
     // of the value and the clock we acquire.
     v = NoTsanAtomicLoad(a, mo);
@@ -290,12 +293,24 @@ static T AtomicRMW(ThreadState *thr, uptr pc, volatile T *a, T v, morder mo) {
   {
     auto s = ctx->metamap.GetSyncOrCreate(thr, pc, (uptr)a, false);
     RWLock lock(&s->mtx, IsReleaseOrder(mo));
-    if (IsAcqRelOrder(mo))
+    if (IsAcqRelOrder(mo)) {
       thr->clock.ReleaseAcquire(&s->clock);
-    else if (IsReleaseOrder(mo))
+
+      Printf("AtomicRMW (Clock ReleaseAcquire)");
+      PrintVectorClock(ctx, thr);
+    }
+    else if (IsReleaseOrder(mo)) {
       thr->clock.Release(&s->clock);
-    else if (IsAcquireOrder(mo))
+
+      Printf("AtomicRMW (Clock Release)");
+      PrintVectorClock(ctx, thr);
+    }
+    else if (IsAcquireOrder(mo)) {
       thr->clock.Acquire(s->clock);
+
+      Printf("AtomicRMW (Clock Acquire)");
+      PrintVectorClock(ctx, thr);
+    }
     v = F(a, v);
   }
   if (IsReleaseOrder(mo))
@@ -433,12 +448,25 @@ static bool AtomicCAS(ThreadState *thr, uptr pc, volatile T *a, T *c, T v,
       *c = pr;
       mo = fmo;
     }
-    if (success && IsAcqRelOrder(mo))
+    if (success && IsAcqRelOrder(mo)) {
       thr->clock.ReleaseAcquire(&s->clock);
-    else if (success && IsReleaseOrder(mo))
+
+      Printf("AtomicCAS (Clock ReleaseAcquire)");
+      PrintVectorClock(ctx, thr);
+    }
+    else if (success && IsReleaseOrder(mo)) {
       thr->clock.Release(&s->clock);
-    else if (IsAcquireOrder(mo))
+
+      Printf("AtomicCAS (Clock Release)");
+      PrintVectorClock(ctx, thr);
+    }
+    else if (IsAcquireOrder(mo)) {
       thr->clock.Acquire(s->clock);
+
+      Printf("AtomicCAS (Clock Acquire)");
+      PrintVectorClock(ctx, thr);
+    }
+      
   }
   if (success && release)
     IncrementEpoch(thr);

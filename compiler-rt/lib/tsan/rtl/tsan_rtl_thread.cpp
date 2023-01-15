@@ -150,16 +150,6 @@ struct OnStartedArgs {
   uptr tls_size;
 };
 
-void PrintVectorClock(__tsan::Context* ctx, ThreadState* thr) {
-    uptr nthread, nlive;
-    ctx->thread_registry.GetNumberOfThreads(&nthread, &nlive);
-    Printf("Vector clock: [ ");
-    for (int i = 0; i < nthread; ++i) {
-        Printf("%d ", (int)thr->clock.clk_[i]);
-    }
-    Printf("]\n");
-}
-
 void ThreadStart(ThreadState *thr, Tid tid, tid_t os_id,
                  ThreadType thread_type) {
   ctx->thread_registry.StartThread(tid, os_id, thread_type, thr);
@@ -227,6 +217,8 @@ void ThreadContext::OnStarted(void *arg) {
 
 void ThreadFinish(ThreadState *thr) {
   DPrintf("#%d: ThreadFinish\n", thr->tid);
+  Printf("Thread with thread slotID %d finished\n", thr->fast_state.sid());
+  PrintVectorClock(ctx, thr);
   ThreadCheckIgnore(thr);
   if (thr->stk_addr && thr->stk_size)
     DontNeedShadowFor(thr->stk_addr, thr->stk_size);
