@@ -1,4 +1,4 @@
-Tsan Projektarbeit.
+Tsan Projektarbeit
 
 Requirements: 
   CMAKE 3.13.4 or higher
@@ -39,7 +39,7 @@ Option2:
 
     set(CMAKE_CXX_COMPILER "/home/martin/CLionProjects/llvm-project-2/build/bin/clang++")
 
-    # add_compile_options(-fsanitize=thread)
+    # dd_compile_options(-fsanitize=thread)
     add_link_options(-fsanitize=thread)
 
     add_executable(your_name_to_call_without_flags your_program.cc)
