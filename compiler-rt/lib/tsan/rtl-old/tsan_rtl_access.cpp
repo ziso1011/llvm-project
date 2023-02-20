@@ -167,6 +167,7 @@ void HandleRace(ThreadState *thr, u64 *shadow_mem, Shadow cur, Shadow old) {
 #endif
 }
 
+// TODO: Happens before
 static inline bool HappensBefore(Shadow old, ThreadState *thr) {
   return thr->clock.get(old.TidWithIgnore()) >= old.epoch();
 }
@@ -351,6 +352,8 @@ ALWAYS_INLINE USED void MemoryAccess(ThreadState *thr, uptr pc, uptr addr,
                                      int kAccessSizeLog, bool kAccessIsWrite,
                                      bool kIsAtomic) {
   RawShadow *shadow_mem = MemToShadow(addr);
+  if
+  Printf("Thread ")
   DPrintf2(
       "#%d: MemoryAccess: @%p %p size=%d"
       " is_write=%d shadow_mem=%p {%zx, %zx, %zx, %zx}\n",
@@ -358,6 +361,8 @@ ALWAYS_INLINE USED void MemoryAccess(ThreadState *thr, uptr pc, uptr addr,
       (int)(1 << kAccessSizeLog), kAccessIsWrite, shadow_mem,
       (uptr)shadow_mem[0], (uptr)shadow_mem[1], (uptr)shadow_mem[2],
       (uptr)shadow_mem[3]);
+
+    thr->current
 #if SANITIZER_DEBUG
   if (!IsAppMem(addr)) {
     Printf("Access to non app mem %zx\n", addr);

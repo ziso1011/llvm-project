@@ -131,6 +131,9 @@ Tid ThreadCreate(ThreadState *thr, uptr pc, uptr uid, bool detached) {
   }
   Tid tid = ctx->thread_registry.CreateThread(uid, detached, parent, &arg);
   DPrintf("#%d: ThreadCreate tid=%d uid=%zu\n", parent, tid, uid);
+  #ifdef LOG_THREAD_FORK
+  Printf("Thread %d: Created by thread %d\n", tid, parent,uid);
+  #endif
   return tid;
 }
 
@@ -157,9 +160,8 @@ void ThreadStart(ThreadState *thr, Tid tid, tid_t os_id,
   if (!thr->ignore_sync) {
     SlotAttachAndLock(thr);
     if (thr->tctx->sync_epoch == ctx->global_epoch) {
-        Printf("Thread with thread slotID %d started\n", thr->fast_state.sid());
+        Printf("Thread %d: Started\n", tid);
         thr->clock.Acquire(thr->tctx->sync);
-        PrintVectorClock(ctx, thr);
       }
     SlotUnlock(thr);
   }
@@ -218,7 +220,7 @@ void ThreadContext::OnStarted(void *arg) {
 
 void ThreadFinish(ThreadState *thr) {
   DPrintf("#%d: ThreadFinish\n", thr->tid);
-  Printf("Thread with thread slotID %d finished\n", thr->fast_state.sid());
+  Printf("Thread %d: Finished\n", thr->fast_state.sid());
   PrintVectorClock(ctx, thr);
   ThreadCheckIgnore(thr);
   if (thr->stk_addr && thr->stk_size)
@@ -300,6 +302,9 @@ struct JoinArg {
 void ThreadJoin(ThreadState *thr, uptr pc, Tid tid) {
   CHECK_GT(tid, 0);
   DPrintf("#%d: ThreadJoin tid=%d\n", thr->tid, tid);
+  #ifdef LOG_THREAD_JOIN
+  Printf("Thread %d: ThreadJoin requested by thread %d\n", tid, thr->tid);
+  #endif
   JoinArg arg = {};
   ctx->thread_registry.JoinThread(tid, &arg);
   if (!thr->ignore_sync) {

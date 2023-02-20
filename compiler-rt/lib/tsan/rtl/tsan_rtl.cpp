@@ -857,6 +857,9 @@ static void ForkAfter(ThreadState* thr) SANITIZER_NO_THREAD_SAFETY_ANALYSIS {
 void ForkParentAfter(ThreadState* thr, uptr pc) { ForkAfter(thr); }
 
 void ForkChildAfter(ThreadState* thr, uptr pc, bool start_thread) {
+  // #ifdef LOG_THREAD_FORK
+  Printf("Thread %d: Forked by thread %d\n", thr->tid, pc);
+  // #endif
   ForkAfter(thr);
   u32 nthread = ctx->thread_registry.OnFork(thr->tid);
   VPrintf(1,

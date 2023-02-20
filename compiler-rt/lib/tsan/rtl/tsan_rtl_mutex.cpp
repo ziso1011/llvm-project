@@ -241,7 +241,9 @@ int MutexUnlock(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
           s->owner_tid = kInvalidTid;
           if (!thr->ignore_sync) {
             thr->clock.ReleaseStore(&s->clock);
+            #ifdef LOG_MUTEX_ACTIONS
             Printf("MutexUnlock (Clock ReleaseStore)");
+            #endif
             PrintVectorClock(ctx, thr);
             released = true;
           }
@@ -253,8 +255,14 @@ int MutexUnlock(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
         ctx->dd->MutexBeforeUnlock(&cb, &s->dd, true);
       }
     }
-    if (released)
+    if (released) {
       IncrementEpoch(thr);
+
+      #ifdef LOG_MUTEX_EPOCH_INCREMENTS
+      Epoch epoch = EpochInc(thr->fast_state.epoch());
+      Printf("Epoch increment on mutex unlock. New epoch is %i", epoch);
+      #endif 
+    }
   }
   if (report_bad_unlock)
     ReportMutexMisuse(thr, pc, ReportTypeMutexBadUnlock, addr,
@@ -345,7 +353,9 @@ void MutexReadUnlock(ThreadState *thr, uptr pc, uptr addr) {
         }
       }
       if (!thr->ignore_sync) {
+        #ifdef LOG_MUTEX_ACTIONS
         Printf("Release");
+        #endif
         thr->clock.Release(&s->read_clock);
         released = true;
       }
@@ -354,8 +364,15 @@ void MutexReadUnlock(ThreadState *thr, uptr pc, uptr addr) {
         ctx->dd->MutexBeforeUnlock(&cb, &s->dd, false);
       }
     }
-    if (released)
+
+    if (released) {
       IncrementEpoch(thr);
+
+      #ifdef LOG_MUTEX_EPOCH_INCREMENTS
+      Epoch epoch = EpochInc(thr->fast_state.epoch());
+      Printf("Epoch increment on mutex read unlock. New epoch is %i", epoch);
+      #endif 
+    }
   }
   if (report_bad_unlock)
     ReportMutexMisuse(thr, pc, ReportTypeMutexBadReadUnlock, addr,
@@ -408,12 +425,19 @@ void MutexReadOrWriteUnlock(ThreadState *thr, uptr pc, uptr addr) {
         ctx->dd->MutexBeforeUnlock(&cb, &s->dd, write);
       }
     }
-    if (released)
+    if (released) {
       IncrementEpoch(thr);
+
+      #ifdef LOG_MUTEX_EPOCH_INCREMENTS
+      Epoch epoch = EpochInc(thr->fast_state.epoch());
+      Printf("Epoch increment on mutex read or write unlock. New epoch is %i", epoch);
+      #endif 
+    }
   }
   if (report_bad_unlock)
     ReportMutexMisuse(thr, pc, ReportTypeMutexBadUnlock, addr,
                       creation_stack_id);
+
   if (common_flags()->detect_deadlocks) {
     Callback cb(thr, pc);
     ReportDeadlock(thr, pc, ctx->dd->GetReport(&cb));
@@ -474,10 +498,19 @@ void Release(ThreadState *thr, uptr pc, uptr addr) {
     Lock lock(&s->mtx);
     thr->clock.Release(&s->clock);
 
+
+    #ifdef LOG_MUTEX_ACTIONS
     Printf("Mutex Release (Clock Release)");
     PrintVectorClock(ctx, thr);
+    #endif
   }
+
   IncrementEpoch(thr);
+
+  #ifdef LOG_MUTEX_EPOCH_INCREMENTS
+  Epoch epoch = EpochInc(thr->fast_state.epoch());
+  Printf("Epoch increment on mutex release. New epoch is %i", epoch);
+  #endif 
 }
 
 void ReleaseStore(ThreadState *thr, uptr pc, uptr addr) {
@@ -489,11 +522,18 @@ void ReleaseStore(ThreadState *thr, uptr pc, uptr addr) {
     auto s = ctx->metamap.GetSyncOrCreate(thr, pc, addr, false);
     Lock lock(&s->mtx);
     thr->clock.ReleaseStore(&s->clock);
-
+    
+    #ifdef LOG_MUTEX_ACTIONS
     Printf("Mutex ReleaseStore (Clock ReleaseStore)");
+    #endif
     PrintVectorClock(ctx, thr);
   }
   IncrementEpoch(thr);
+
+  #ifdef LOG_MUTEX_EPOCH_INCREMENTS
+  Epoch epoch = EpochInc(thr->fast_state.epoch());
+  Printf("Epoch increment on mutex release store. Current epoch is %i", epoch);
+  #endif
 }
 
 void ReleaseStoreAcquire(ThreadState *thr, uptr pc, uptr addr) {
@@ -506,10 +546,18 @@ void ReleaseStoreAcquire(ThreadState *thr, uptr pc, uptr addr) {
     Lock lock(&s->mtx);
     thr->clock.ReleaseStoreAcquire(&s->clock);
 
-    Printf("Mutex ReleaseStoreAcquire (Clock ReleaseStoreAcquire)");
+    #ifdef LOG_MUTEX_ACTIONS
+    Printf("#%d: ReleaseStoreAcquire with vector clock %zx\n", thr->tid, addr);
     PrintVectorClock(ctx, thr);
+    #endif
   }
+
   IncrementEpoch(thr);
+
+  #ifdef LOG_MUTEX_EPOCH_INCREMENTS
+  Epoch epoch = EpochInc(thr->fast_state.epoch());
+  Printf("Epoch increment on mutex release store acquire. Current epoch is %i", epoch);
+  #endif
 }
 
 void IncrementEpoch(ThreadState *thr) {

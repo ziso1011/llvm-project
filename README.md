@@ -65,9 +65,28 @@ TSan uses instrumentation, where it injects its own code into the program being 
 This causes TSan to loose information, generate false positives or even crash.
 For that reason we only can use the build in `Printf` function wich is a thread-safe and does not interleave with the program execution.
 
+### Defining what will be logged
+
+In the file `log.h`, several `#defines` are used that determine how the logging is done. To disable logging at the given positons, the appropriate line has to be commented out.
+
+- `LOG_MUTEX_EPOCH_INCREMENTS`: Enables logging of epoch increments in the mutex (implemented in `tsan_rtl_mutex.cpp`)
+- `LOG_MUTEX_ACTIONS`: Enables logging of actions in the mutex (implemented in `tsan_rtl_mutex.cpp`)
+
 ### Logging vector clocks
 
-To log the vector clocks, we use the following code:
+To log the vector clock of a given thread, the following code is used:
+
+```cpp
+void PrintVectorClock(__tsan::Context* ctx, __tsan::ThreadState* thr) {
+    unsigned long nthread, nlive;
+    ctx->thread_registry.GetNumberOfThreads(&nthread, &nlive);
+    __sanitizer::Printf("Vector clock: [ ");
+    for (int i = 0; i < nthread; ++i) {
+        __sanitizer::Printf("%d ", (int)thr->clock.clk_[i]);
+    }
+    __sanitizer::Printf("]\n");
+}
+```
 
 ![grafik](https://user-images.githubusercontent.com/73063108/212671463-88f1ef17-4b7c-47bc-b56b-4f0006feaf1a.png)
 
