@@ -132,7 +132,7 @@ Tid ThreadCreate(ThreadState *thr, uptr pc, uptr uid, bool detached) {
   Tid tid = ctx->thread_registry.CreateThread(uid, detached, parent, &arg);
   DPrintf("#%d: ThreadCreate tid=%d uid=%zu\n", parent, tid, uid);
   #ifdef LOG_THREAD_FORK
-  Printf("Thread %d: Created by thread %d\n", tid, parent,uid);
+  Printf("%d | f(%d)\n", parent, tid);
   #endif
   return tid;
 }
@@ -160,7 +160,7 @@ void ThreadStart(ThreadState *thr, Tid tid, tid_t os_id,
   if (!thr->ignore_sync) {
     SlotAttachAndLock(thr);
     if (thr->tctx->sync_epoch == ctx->global_epoch) {
-        Printf("Thread %d: Started\n", tid);
+        // Printf("xx | f(%d)\n", tid);
         thr->clock.Acquire(thr->tctx->sync);
       }
     SlotUnlock(thr);
