@@ -300,7 +300,7 @@ static SymbolizedStack *SkipTsanInternalFrames(SymbolizedStack *frames) {
 }
 
 void PrintReport(const ReportDesc *rep) {
-  #ifdef TSAN_OUTPUT
+  #ifdef TSAN_DEFAULT_OUTPUT
   Decorator d;
   Printf("==================\n");
   const char *rep_typ_str = ReportTypeString(rep->typ, rep->tag);
