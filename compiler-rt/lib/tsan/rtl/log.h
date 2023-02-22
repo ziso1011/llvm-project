@@ -27,7 +27,6 @@ namespace __tsan {
 // #define LOG_THREAD_FINISHED
 // #define LOG_MUTEX_EPOCH_INCREMENTS
 // #define LOG_MUTEX_ACTIONS
-
-
+#define LOG_REPORT
 
 #endif // !TSAN_LOG_H

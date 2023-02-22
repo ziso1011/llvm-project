@@ -220,10 +220,6 @@ void ThreadContext::OnStarted(void *arg) {
 
 void ThreadFinish(ThreadState *thr) {
   DPrintf("#%d: ThreadFinish\n", thr->tid);
-  #ifdef LOG_THREAD_FINISHED
-  Printf("%d Finished\n", thr->fast_state.sid());
-  #endif
-  PrintVectorClock(ctx, thr);
   ThreadCheckIgnore(thr);
   if (thr->stk_addr && thr->stk_size)
     DontNeedShadowFor(thr->stk_addr, thr->stk_size);
