@@ -111,4 +111,20 @@ void PrintVectorClock(__tsan::Context* ctx, __tsan::ThreadState* thr) {
 
 This method prints the state of the vector clock at a certain time.
 
-Where can we find the events in the code?
+## Common Problems
+
+### Platform issues:
+
+Since LLVM and Clang have been developed and tested for many different platforms, it is possible that certain features may be platform-dependent and may lead to compilation errors or incorrect behavior.
+
+### Configuration issues:
+
+Errors can also occur in the configurations. There are platform-specific bugs that occur when certain features are enabled or disabled. An incorrect configuration can result in certain features being unavailable or the code not compiling correctly.
+
+### Memory errors during compilation:
+
+During compilation, large amounts of code and data are held in memory, especially when multiple processes are running simultaneously. To minimize this problem, you should ensure that you have enough memory to perform the build and close unnecessary processes and applications during the build. You can also reduce the memory requirements of the build process by disabling certain features that you do not need, or by using a less extensive configuration. In some cases, optimized settings for the compiler and linker can also help to reduce the memory requirements and make the build faster and more reliable.
+
+### Using C++ libraries in the project:
+
+As of now, it is unfortunately not possible to use C++ libraries. However, most C libraries can be used without any problems.
