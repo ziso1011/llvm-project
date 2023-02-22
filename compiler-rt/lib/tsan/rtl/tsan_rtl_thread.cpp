@@ -220,7 +220,9 @@ void ThreadContext::OnStarted(void *arg) {
 
 void ThreadFinish(ThreadState *thr) {
   DPrintf("#%d: ThreadFinish\n", thr->tid);
-  Printf("Thread %d: Finished\n", thr->fast_state.sid());
+  #ifdef LOG_THREAD_FINISHED
+  Printf("%d Finished\n", thr->fast_state.sid());
+  #endif
   PrintVectorClock(ctx, thr);
   ThreadCheckIgnore(thr);
   if (thr->stk_addr && thr->stk_size)
@@ -303,7 +305,7 @@ void ThreadJoin(ThreadState *thr, uptr pc, Tid tid) {
   CHECK_GT(tid, 0);
   DPrintf("#%d: ThreadJoin tid=%d\n", thr->tid, tid);
   #ifdef LOG_THREAD_JOIN
-  Printf("Thread %d: ThreadJoin requested by thread %d\n", tid, thr->tid);
+  Printf("%d | j(%d) \n", thr->tid, tid);
   #endif
   JoinArg arg = {};
   ctx->thread_registry.JoinThread(tid, &arg);

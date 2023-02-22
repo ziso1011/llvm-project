@@ -16,6 +16,7 @@
 #include "sanitizer_common/sanitizer_placement_new.h"
 #include "sanitizer_common/sanitizer_report_decorator.h"
 #include "sanitizer_common/sanitizer_stacktrace_printer.h"
+#include "log.h"
 
 namespace __tsan {
 
@@ -299,6 +300,7 @@ static SymbolizedStack *SkipTsanInternalFrames(SymbolizedStack *frames) {
 }
 
 void PrintReport(const ReportDesc *rep) {
+  #ifdef TSAN_OUTPUT
   Decorator d;
   Printf("==================\n");
   const char *rep_typ_str = ReportTypeString(rep->typ, rep->tag);
@@ -377,6 +379,7 @@ void PrintReport(const ReportDesc *rep) {
     DumpProcessMap();
 
   Printf("==================\n");
+  #endif
 }
 
 #else  // #if !SANITIZER_GO
