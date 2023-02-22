@@ -69,8 +69,24 @@ For that reason we only can use the build in `Printf` function wich is a thread-
 
 In the file `log.h`, several `#defines` are used that determine how the logging is done. To disable logging at the given positons, the appropriate line has to be commented out.
 
-- `LOG_MUTEX_EPOCH_INCREMENTS`: Enables logging of epoch increments in the mutex (implemented in `tsan_rtl_mutex.cpp`)
-- `LOG_MUTEX_ACTIONS`: Enables logging of actions in the mutex (implemented in `tsan_rtl_mutex.cpp`)
+- `TSAN_DEFAULT_OUTPUT`: Enables the default Report output of Tsan.(implemented in `tsan_report.cpp`). To improve visibility of other logs, it is recommended to comment this out.
+- `LOG_THREAD_ON_READ` : Enables logging of read Operations (implemented in `tsan_rtl_access.cpp`).
+- `LOG_THREAD_ON_WRITE` : Enables logging of write Operations in threads (implemented in `tsan_rtl_access.cpp`).
+- `LOG_MUTEX_LOCK_UNLOCK` : Enables logging for lock/unlock mutex operations (implemented in `tsan_rtl_mutex.cpp`).
+- `LOG_THREAD_JOIN` : Enables logging of join operations in threads (implemented in `tsan_rtl_thread.cpp`).
+- `LOG_THREAD_FORK` : Enables logging of fork operations in threads (implemented in `tsan_rtl_thread.cpp`).
+- `LOG_THREAD_FINISH` : Enables logging if a thread is finished (implemented in `tsan_rtl_thread.cpp`).
+- `LOG_MUTEX_EPOCH_INCREMENTS`: Enables logging of epoch increments in the mutex (implemented in `tsan_rtl_mutex.cpp`).
+- `LOG_MUTEX_ACTIONS`: Enables logging of actions in the mutex (implemented in `tsan_rtl_mutex.cpp`).
+
+### Output format:
+- Read: ThreadID | r(memory address) | epoch
+- Write: ThreadID | wr(memory address) | epoch
+- Lock: ThreadID | l(memory address) | epoch
+- Unlock: ThreadID | u(memory address) | epoch
+- Join: ThreadID | j(terminated Thread) | epoch
+- Fork:ThreadID | f(started Thread) | epoch
+- Finished: ThreadID: Finished
 
 ### Logging vector clocks
 
