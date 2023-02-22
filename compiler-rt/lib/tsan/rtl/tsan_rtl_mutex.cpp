@@ -69,7 +69,7 @@ static void ReportMutexMisuse(ThreadState *thr, uptr pc, ReportType typ,
 static void RecordMutexLock(ThreadState *thr, uptr pc, uptr addr,
                             StackID stack_id, bool write) {
   auto typ = write ? EventType::kLock : EventType::kRLock;
-#ifdef LOG_MUTEX_ACTIONS
+#ifdef LOG_MUTEX_LOCK_UNLOCK
   Printf("%d | l(%d) | %u\n", thr->tid, addr, thr->fast_state.epoch());
 #endif
   // Note: it's important to trace before modifying mutex set
@@ -83,7 +83,7 @@ static void RecordMutexLock(ThreadState *thr, uptr pc, uptr addr,
 
 static void RecordMutexUnlock(ThreadState *thr, uptr addr) {
   // See the comment in RecordMutexLock re order of operations.
-#ifdef LOG_MUTEX_ACTIONS
+#ifdef LOG_MUTEX_LOCK_UNLOCK
   Printf("%d | u(%d) | %u\n", thr->tid, addr, thr->fast_state.epoch());
 #endif
   TraceMutexUnlock(thr, addr);
@@ -92,9 +92,6 @@ static void RecordMutexUnlock(ThreadState *thr, uptr addr) {
 
 void MutexCreate(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
   DPrintf("#%d: MutexCreate %zx flagz=0x%x\n", thr->tid, addr, flagz);
-  #ifdef LOG_MUTEX_ACTIONS
-  Printf("%d | l(%d) | %u\n", thr->tid, addr, thr->fast_state.epoch());
-  #endif
   if (!(flagz & MutexFlagLinkerInit) && pc && IsAppMem(addr))
     MemoryAccess(thr, pc, addr, 1, kAccessWrite);
   SlotLocker locker(thr);
@@ -531,7 +528,7 @@ void ReleaseStore(ThreadState *thr, uptr pc, uptr addr) {
     auto s = ctx->metamap.GetSyncOrCreate(thr, pc, addr, false);
     Lock lock(&s->mtx);
     thr->clock.ReleaseStore(&s->clock);
-    
+
     #ifdef LOG_MUTEX_ACTIONS
     Printf("Mutex ReleaseStore (Clock ReleaseStore)");
     #endif
