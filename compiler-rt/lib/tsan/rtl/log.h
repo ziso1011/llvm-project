@@ -19,7 +19,7 @@ namespace __tsan {
 }
 
 // #define LOG_MUTEX_EPOCH_INCREMENTS
-// #define LOG_MUTEX_ACTIONS
+ #define LOG_MUTEX_ACTIONS
 // #define LOG_EPOCH_ON_READ
 // #define LOG_THREAD_ON_READ
 #define LOG_EPOCH_ON_WRITE
