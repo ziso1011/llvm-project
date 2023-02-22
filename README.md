@@ -79,14 +79,17 @@ In the file `log.h`, several `#defines` are used that determine how the logging 
 - `LOG_MUTEX_EPOCH_INCREMENTS`: Enables logging of epoch increments in the mutex (implemented in `tsan_rtl_mutex.cpp`).
 - `LOG_MUTEX_ACTIONS`: Enables logging of actions in the mutex (implemented in `tsan_rtl_mutex.cpp`).
 
-### Output format:
-- Read: ThreadID | r(memory address) | epoch
-- Write: ThreadID | wr(memory address) | epoch
-- Lock: ThreadID | l(memory address) | epoch
-- Unlock: ThreadID | u(memory address) | epoch
-- Join: ThreadID | j(terminated Thread) | epoch
-- Fork:ThreadID | f(started Thread) | epoch
-- Finished: ThreadID: Finished
+### Output format
+
+- `Read`: ThreadID | r(memory address) | epoch
+- `Write`: ThreadID | wr(memory address) | epoch
+- `Lock`: ThreadID | l(memory address) | epoch
+- `Unlock`: ThreadID | u(memory address) | epoch
+- `Join`: ThreadID | j(terminated Thread) | epoch
+- `Fork`: ThreadID | f(started Thread) | epoch
+- `Finished`: ThreadID: Finished
+
+### Print statement locations
 
 ### Logging vector clocks
 
