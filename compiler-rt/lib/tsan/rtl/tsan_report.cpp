@@ -149,7 +149,6 @@ static void PrintMop(const ReportMop *mop, bool first) {
   char thrbuf[kThreadBufSize];
   Printf("%s", d.Access());
   if (mop->external_tag == kExternalTagNone) {
-    // TODO
     Printf("  %s of size %d at %p by %s",
            MopDesc(first, mop->write, mop->atomic), mop->size,
            (void *)mop->addr, thread_name(thrbuf, mop->tid));
@@ -303,7 +302,6 @@ static SymbolizedStack *SkipTsanInternalFrames(SymbolizedStack *frames) {
 void PrintReport(const ReportDesc *rep) {
   #ifdef TSAN_DEFAULT_OUTPUT
   Decorator d;
-  #ifdef LOG_REPORT
   Printf("==================\n");
   const char *rep_typ_str = ReportTypeString(rep->typ, rep->tag);
   Printf("%s", d.Warning());
