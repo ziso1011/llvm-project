@@ -91,6 +91,118 @@ In the file `log.h`, several `#defines` are used that determine how the logging 
 
 ### Print statement locations
 
+1. `Read` and `Write` (implemented in `tsan_rtl_access.cpp`)
+```cpp
+ALWAYS_INLINE USED void MemoryAccess(ThreadState* thr, uptr pc, uptr addr,
+                                     uptr size, AccessType typ) {
+  RawShadow* shadow_mem = MemToShadow(addr);S
+  
+  if (typ == kAccessWrite) {
+    #ifdef LOG_THREAD_ON_WRITE
+    Printf("%d | wr(%d) | %u\n", thr->tid, addr, thr->fast_state.epoch());
+    #endif
+  } else if (typ == kAccessRead) {
+    #ifdef LOG_THREAD_ON_READ
+    Printf("%d | rd(%d) | %u\n", thr->tid, addr, thr->fast_state.epoch());
+    #endif
+  }
+  ...
+```
+`MemoryAccess()` is a method that performs memory access tracking and race detection for a thread.
+
+2. `Lock` and `Unlock` (implemented in `tsan_rtl_mutex.cpp`)
+```cpp
+static void RecordMutexLock(ThreadState *thr, uptr pc, uptr addr,
+                            StackID stack_id, bool write) {
+  auto typ = write ? EventType::kLock : EventType::kRLock;
+#ifdef LOG_MUTEX_LOCK_UNLOCK
+  Printf("%d | l(%d) | %u\n", thr->tid, addr, thr->fast_state.epoch());
+#endif
+  // Note: it's important to trace before modifying mutex set
+  // because tracing can switch trace part and we write the current
+  // mutex set in the beginning of each part.
+  // If we do it in the opposite order, we will write already reduced
+  // mutex set in the beginning of the part and then trace unlock again.
+  TraceMutexLock(thr, typ, pc, addr, stack_id);
+  thr->mset.AddAddr(addr, stack_id, write);
+}
+
+static void RecordMutexUnlock(ThreadState *thr, uptr addr) {
+  // See the comment in RecordMutexLock re order of operations.
+#ifdef LOG_MUTEX_LOCK_UNLOCK
+  Printf("%d | u(%d) | %u\n", thr->tid, addr, thr->fast_state.epoch());
+#endif
+  TraceMutexUnlock(thr, addr);
+  thr->mset.DelAddr(addr);
+}
+```
+`RecordMutexLock()` and `RecordMutexLock()` are functions that record information about mutex lock and unlock operations.
+
+3. `Join` (implemented in `tsan_rtl_thread.cpp`)
+```cpp
+void ThreadJoin(ThreadState *thr, uptr pc, Tid tid) {
+  CHECK_GT(tid, 0);
+  DPrintf("#%d: ThreadJoin tid=%d\n", thr->tid, tid);
+  #ifdef LOG_THREAD_JOIN
+  Printf("%d | j(%d) \n", thr->tid, tid);
+  #endif
+  JoinArg arg = {};
+  ctx->thread_registry.JoinThread(tid, &arg);
+  if (!thr->ignore_sync) {
+    SlotLocker locker(thr);
+    if (arg.sync_epoch == ctx->global_epoch)
+      thr->clock.Acquire(arg.sync);
+  }
+  Free(arg.sync);
+}
+```
+`ThreadJoin()` is a function that performs a thread join operation.
+
+4. `Fork` (implemented in `tsan_rtl_thread.cpp`)
+```cpp
+Tid ThreadCreate(ThreadState *thr, uptr pc, uptr uid, bool detached) {
+  // The main thread and GCD workers don't have a parent thread.
+  Tid parent = kInvalidTid;
+  OnCreatedArgs arg = {nullptr, 0, kInvalidStackID};
+  if (thr) {
+    parent = thr->tid;
+    arg.stack = CurrentStackId(thr, pc);
+    if (!thr->ignore_sync) {
+      SlotLocker locker(thr);
+      thr->clock.ReleaseStore(&arg.sync);
+      
+      arg.sync_epoch = ctx->global_epoch;
+      IncrementEpoch(thr);
+    }
+  }
+  Tid tid = ctx->thread_registry.CreateThread(uid, detached, parent, &arg);
+  DPrintf("#%d: ThreadCreate tid=%d uid=%zu\n", parent, tid, uid);
+  #ifdef LOG_THREAD_FORK
+  Printf("%d | f(%d)\n", parent, tid);
+  #endif
+  return tid;
+}
+```
+`ThreadCreate()` is a function that creates a new thread.
+
+5. `Finished` (implemented in `tsan_rtl_thread.cpp`)
+```cpp
+void ThreadFinish(ThreadState *thr) {
+  DPrintf("#%d: ThreadFinish\n", thr->tid);
+  #ifdef LOG_THREAD_FINISHED
+  Printf("%d Finished\n", thr->fast_state.sid());
+  #endif
+  PrintVectorClock(ctx, thr);
+  ThreadCheckIgnore(thr);
+  if (thr->stk_addr && thr->stk_size)
+    DontNeedShadowFor(thr->stk_addr, thr->stk_size);
+  if (thr->tls_addr && thr->tls_size)
+    DontNeedShadowFor(thr->tls_addr, thr->tls_size);
+  thr->is_dead = true;
+  ...
+```
+`ThreadFInish()` is a function that is called when a thread is finished or terminated.
+
 ### Logging vector clocks
 
 To log the vector clock of a given thread, the following code is used:
@@ -106,10 +218,7 @@ void PrintVectorClock(__tsan::Context* ctx, __tsan::ThreadState* thr) {
     __sanitizer::Printf("]\n");
 }
 ```
-
-![grafik](https://user-images.githubusercontent.com/73063108/212671463-88f1ef17-4b7c-47bc-b56b-4f0006feaf1a.png)
-
-This method prints the state of the vector clock at a certain time.
+This function prints the state of the vector clock at a certain time.
 
 ## Common Problems
 

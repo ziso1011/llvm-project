@@ -421,7 +421,6 @@ NOINLINE void TraceRestartMemoryAccess(ThreadState* thr, uptr pc, uptr addr,
 ALWAYS_INLINE USED void MemoryAccess(ThreadState* thr, uptr pc, uptr addr,
                                      uptr size, AccessType typ) {
   RawShadow* shadow_mem = MemToShadow(addr);
-
   
   if (typ == kAccessWrite) {
     #ifdef LOG_THREAD_ON_WRITE
