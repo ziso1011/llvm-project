@@ -108,7 +108,7 @@ ALWAYS_INLINE USED void MemoryAccess(ThreadState* thr, uptr pc, uptr addr,
   }
   ...
 ```
-`MemoryAccess()` is a method that performs memory access tracking and race detection for a thread.
+`MemoryAccess()` is a function that performs memory access tracking and race detection for a thread.
 
 2. `Lock` and `Unlock` (implemented in `tsan_rtl_mutex.cpp`)
 ```cpp
