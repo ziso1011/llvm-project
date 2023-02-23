@@ -236,4 +236,4 @@ During compilation, large amounts of code and data are held in memory, especiall
 
 ### Using C++ libraries in the project:
 
-As of now, it is unfortunately not possible to use C++ libraries. However, most C libraries can be used without any problems.
+As of now, it is unfortunately not possible to use C++ Standard-libraries. However, most C libraries can be used without any problems.
