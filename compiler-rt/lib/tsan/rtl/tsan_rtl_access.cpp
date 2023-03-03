@@ -13,6 +13,7 @@
 
 #include "tsan_rtl.h"
 #include "log.h"
+#include "tsan_interface.h"
 
 namespace __tsan {
 
@@ -425,14 +426,49 @@ ALWAYS_INLINE USED void MemoryAccess(ThreadState* thr, uptr pc, uptr addr,
   if (typ == kAccessWrite) {
     #ifdef LOG_THREAD_ON_WRITE
     Printf("%d | wr(%d) | %u\n", thr->tid, addr, thr->fast_state.epoch());
+    PrintCurrentStack(thr, pc);
+
+    // VarSizeStackTrace traces[2];
+    // Tid tids[2] = {thr->tid, kInvalidTid};
+    // uptr tags[2] = {kExternalTagNone, kExternalTagNone};
+    
+    // uptr out_buf_size = 500;
+    // char out_buf[out_buf_size];
+    // ObtainCurrentStack(thr, thr->trace_prev_pc, &traces[0], &tags[0]);
+    // traces[0].PrintTo(out_buf, out_buf_size);
+    // Printf("%s\n", out_buf);
     #endif
   } else if (typ == kAccessRead) {
     #ifdef LOG_THREAD_ON_READ
-    Printf("%d | rd(%d) | %u\n", thr->tid, addr, thr->fast_state.epoch());
+    Printf("%d | rd(%d) | %u", thr->tid, addr, thr->fast_state.epoch());
+    PrintCurrentStack(thr, pc);
+
+    // VarSizeStackTrace traces[2];
+    // Tid tids[2] = {thr->tid, kInvalidTid};
+    // uptr tags[2] = {kExternalTagFirstUserAvailable, kExternalTagNone};
+    
+    // uptr out_buf_size = 500;
+    // char out_buf[out_buf_size];
+    // ObtainCurrentStack(thr, thr->trace_prev_pc, &traces[0], &tags[0]);
+    // traces[0].PrintTo(out_buf, out_buf_size);
+    // Printf("%s\n", out_buf);
+
+    // SymbolizedStack *frame = ent->frames;
+    // for (int i = 0; frame && frame->info.address; frame = frame->next, i++) {
+    //   InternalScopedString res;
+    //   RenderFrame(&res, common_flags()->stack_trace_format, i,
+    //               frame->info.address, &frame->info,
+    //               common_flags()->symbolize_vs_style,
+    //               common_flags()->strip_path_prefix, kInterposedFunctionPrefix);
+    //   Printf("%s\n", res.data());
+    // }
+    // Printf("\n");
+
     #endif
   }
 
   UNUSED char memBuf[4][64];
+
   DPrintf2("#%d: Access: %d@%d %p/%zd typ=0x%x {%s, %s, %s, %s}\n", thr->tid,
            static_cast<int>(thr->fast_state.sid()),
            static_cast<int>(thr->fast_state.epoch()), (void*)addr, size,
