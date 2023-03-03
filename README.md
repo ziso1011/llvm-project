@@ -67,7 +67,7 @@ The following TSan events can be logged:
 
 We use the `Printf` function provided by the sanitizer library in order to output log messages to `std::err`. The normal output of the program is written to `std::out`.
 
-### Why we can we only use the build in `Printf`
+### Why we can only use the build in `Printf`
 
 TSan uses instrumentation to monitor memory accesses and detect data races by injecting its own code into the program being analyzed. However, certain operations such as opening, closing, reading, and writing can cause interleaved execution of the program with the runtime library, which may result in TSan losing information, generating false positives, or crashing.
 
@@ -86,6 +86,8 @@ The file `log.h` can be found at `llvm-project/compiler-rt/lib/tsan/rtl/log.h`, 
 - `LOG_THREAD_FINISH` : Enables logging if a thread is finished (implemented in `tsan_rtl_thread.cpp`).
 - `LOG_MUTEX_EPOCH_INCREMENTS`: Enables logging of epoch increments in the mutex (implemented in `tsan_rtl_mutex.cpp`).
 - `LOG_MUTEX_ACTIONS`: Enables logging of actions in the mutex (implemented in `tsan_rtl_mutex.cpp`).
+
+**After making any changes, the project must also be recompiled !!!**
 
 ### Output format
 
