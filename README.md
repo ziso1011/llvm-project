@@ -24,7 +24,7 @@ More information about llvm and the build flags can be found [here](https://llvm
 
 ## Usage
 
-In order to compile your program with TSan enabled, you have to options.
+In order to compile your program with TSan enabled, you have two options.
 
 ### Option 1 (CMake)
 
@@ -52,22 +52,30 @@ In order to compile your program with TSan enabled, you have to options.
 2. Run your program with `./a.out 2> log.txt` to log the TSan output into `log.txt`
 3. Open the log `log.txt` file to analyze the TSan output
 
+**note:** To just get it as console output, remove the `2> log.txt`. 
+
 ## Logging
 
-The following TSan events are logged:
+The following TSan events can be logged:
 
-- Read/write operations.
-- Vector clocks synchronizations (not yet finished)
+- Read/Write operations.
+- Fork/Join/Finished operations for Threads.
+- Lock/Unlock mutex operations.
+- Mutex actions.
+- Epoch increments.
+
 
 We use the `Printf` function provided by the sanitizer library in order to output log messages to `std::err`. The normal output of the program is written to `std::out`.
 
-TSan uses instrumentation, where it injects its own code into the program being analyzed to monitor memory accesses and detect data races. Operations such as opening, closing, reading, and writing can cause the execution of the program to be interleaved with the execution of the runtime library.
-This causes TSan to loose information, generate false positives or even crash.
-For that reason we only can use the build in `Printf` function wich is a thread-safe and does not interleave with the program execution.
+### Why we can we only use the build in `Printf`
+
+TSan uses instrumentation to monitor memory accesses and detect data races by injecting its own code into the program being analyzed. However, certain operations such as opening, closing, reading, and writing can cause interleaved execution of the program with the runtime library, which may result in TSan losing information, generating false positives, or crashing.
+
+To address this issue, the developers of TSan have designed a dedicated print method that ensures the output is atomic and consistent. As a result, only the built-in `Printf` function should be used because it is thread-safe and does not interleave with program execution.
 
 ### Defining what will be logged
 
-In the file `log.h`, several `#defines` are used that determine how the logging is done. To disable logging at the given positons, the appropriate line has to be commented out.
+The file `log.h` can be found at `llvm-project/compiler-rt/lib/tsan/rtl/log.h`, and it contains several `#defines` that specify how logging is performed. To disable logging at specific locations, simply comment out the appropriate line.
 
 - `TSAN_DEFAULT_OUTPUT`: Enables the default Report output of Tsan.(implemented in `tsan_report.cpp`). To improve visibility of other logs, it is recommended to comment this out.
 - `LOG_THREAD_ON_READ` : Enables logging of read Operations (implemented in `tsan_rtl_access.cpp`).
@@ -96,7 +104,7 @@ In the file `log.h`, several `#defines` are used that determine how the logging 
 ALWAYS_INLINE USED void MemoryAccess(ThreadState* thr, uptr pc, uptr addr,
                                      uptr size, AccessType typ) {
   RawShadow* shadow_mem = MemToShadow(addr);S
-  
+ 
   if (typ == kAccessWrite) {
     #ifdef LOG_THREAD_ON_WRITE
     Printf("%d | wr(%d) | %u\n", thr->tid, addr, thr->fast_state.epoch());
@@ -219,6 +227,15 @@ void PrintVectorClock(__tsan::Context* ctx, __tsan::ThreadState* thr) {
 }
 ```
 This function prints the state of the vector clock at a certain time.
+
+### Example Output
+
+For the following Program:
+```
+TODO program
+```
+Generated Output:
+TODO
 
 ## Common Problems
 
