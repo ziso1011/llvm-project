@@ -215,7 +215,10 @@ void ThreadFinish(ThreadState *thr) {
 
 ### Logging vector clocks
 
-To log the vector clock of a given thread, the following code is used:
+Like the other `#defines` u can comment in the `PRINT_VECTOR_CLOCK` in the `log.h` file.
+Please note that we have only provided the vector clocks here for testing purposes. Therefore, the output may be inaccurate or incomplete.
+
+To log the vector clock of a given thread, the following code is used: (implemented in `log.cpp`)
 
 ```cpp
 void PrintVectorClock(__tsan::Context* ctx, __tsan::ThreadState* thr) {
@@ -232,12 +235,13 @@ This function prints the state of the vector clock at a certain time.
 
 ### Example Output
 
-For the following Program:
+Example output for the following program:
 ```
 TODO program
 ```
 Generated Output:
-TODO
+
+TODO output
 
 ## Common Problems
 

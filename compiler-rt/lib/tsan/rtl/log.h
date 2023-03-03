@@ -18,15 +18,17 @@ namespace __tsan {
     void PrintVectorClock(__tsan::Context* ctx, __tsan::ThreadState* thr);
 }
 
-#define TSAN_DEFAULT_OUTPUT
+//#define TSAN_DEFAULT_OUTPUT
 #define LOG_THREAD_ON_READ
 #define LOG_THREAD_ON_WRITE
 #define LOG_MUTEX_LOCK_UNLOCK
 #define LOG_THREAD_JOIN
 #define LOG_THREAD_FORK
-// #define LOG_THREAD_FINISHED
+#define LOG_THREAD_FINISHED
 // #define LOG_MUTEX_EPOCH_INCREMENTS
 // #define LOG_MUTEX_ACTIONS
+
+// #define PRINT_VECTOR_CLOCK
 
 
 

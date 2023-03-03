@@ -241,7 +241,9 @@ static T AtomicLoad(ThreadState *thr, uptr pc, const volatile T *a, morder mo) {
     thr->clock.Acquire(s->clock);
 
     Printf("Atomic Load");
+    #ifdef PRINT_VECTOR_CLOCK
     PrintVectorClock(ctx, thr);
+    #endif
     // Re-read under sync mutex because we need a consistent snapshot
     // of the value and the clock we acquire.
     v = NoTsanAtomicLoad(a, mo);
@@ -281,7 +283,9 @@ static void AtomicStore(ThreadState *thr, uptr pc, volatile T *a, T v,
     Lock lock(&s->mtx);
     thr->clock.ReleaseStore(&s->clock);
     Printf("AtomicStore (Clock ReleaseStore)");
+    #ifdef PRINT_VECTOR_CLOCK
     PrintVectorClock(ctx, thr);
+    #endif
     NoTsanAtomicStore(a, v, mo);
   }
   IncrementEpoch(thr);
@@ -300,19 +304,25 @@ static T AtomicRMW(ThreadState *thr, uptr pc, volatile T *a, T v, morder mo) {
       thr->clock.ReleaseAcquire(&s->clock);
 
       Printf("AtomicRMW (Clock ReleaseAcquire)");
-      PrintVectorClock(ctx, thr);
+      #ifdef PRINT_VECTOR_CLOCK
+    PrintVectorClock(ctx, thr);
+    #endif
     }
     else if (IsReleaseOrder(mo)) {
       thr->clock.Release(&s->clock);
 
       Printf("AtomicRMW (Clock Release)");
-      PrintVectorClock(ctx, thr);
+      #ifdef PRINT_VECTOR_CLOCK
+    PrintVectorClock(ctx, thr);
+    #endif
     }
     else if (IsAcquireOrder(mo)) {
       thr->clock.Acquire(s->clock);
 
       Printf("AtomicRMW (Clock Acquire)");
-      PrintVectorClock(ctx, thr);
+      #ifdef PRINT_VECTOR_CLOCK
+    PrintVectorClock(ctx, thr);
+    #endif
     }
     v = F(a, v);
   }
@@ -455,19 +465,25 @@ static bool AtomicCAS(ThreadState *thr, uptr pc, volatile T *a, T *c, T v,
       thr->clock.ReleaseAcquire(&s->clock);
 
       Printf("AtomicCAS (Clock ReleaseAcquire)");
-      PrintVectorClock(ctx, thr);
+      #ifdef PRINT_VECTOR_CLOCK
+    PrintVectorClock(ctx, thr);
+    #endif
     }
     else if (success && IsReleaseOrder(mo)) {
       thr->clock.Release(&s->clock);
 
       Printf("AtomicCAS (Clock Release)");
-      PrintVectorClock(ctx, thr);
+      #ifdef PRINT_VECTOR_CLOCK
+    PrintVectorClock(ctx, thr);
+    #endif
     }
     else if (IsAcquireOrder(mo)) {
       thr->clock.Acquire(s->clock);
 
       Printf("AtomicCAS (Clock Acquire)");
-      PrintVectorClock(ctx, thr);
+      #ifdef PRINT_VECTOR_CLOCK
+    PrintVectorClock(ctx, thr);
+    #endif
     }
       
   }

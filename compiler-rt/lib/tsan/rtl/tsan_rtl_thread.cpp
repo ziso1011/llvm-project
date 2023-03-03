@@ -223,7 +223,9 @@ void ThreadFinish(ThreadState *thr) {
   #ifdef LOG_THREAD_FINISHED
   Printf("%d Finished\n", thr->fast_state.sid());
   #endif
-  PrintVectorClock(ctx, thr);
+  #ifdef PRINT_VECTOR_CLOCK
+    PrintVectorClock(ctx, thr);
+    #endif
   ThreadCheckIgnore(thr);
   if (thr->stk_addr && thr->stk_size)
     DontNeedShadowFor(thr->stk_addr, thr->stk_size);

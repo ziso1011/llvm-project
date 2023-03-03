@@ -250,7 +250,9 @@ int MutexUnlock(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
             #ifdef LOG_MUTEX_ACTIONS
             Printf("MutexUnlock (Clock ReleaseStore)");
             #endif
-            PrintVectorClock(ctx, thr);
+            #ifdef PRINT_VECTOR_CLOCK
+    PrintVectorClock(ctx, thr);
+    #endif
             released = true;
           }
         }
@@ -507,7 +509,9 @@ void Release(ThreadState *thr, uptr pc, uptr addr) {
 
     #ifdef LOG_MUTEX_ACTIONS
     Printf("Mutex Release (Clock Release)");
+    #ifdef PRINT_VECTOR_CLOCK
     PrintVectorClock(ctx, thr);
+    #endif
     #endif
   }
 
@@ -532,7 +536,9 @@ void ReleaseStore(ThreadState *thr, uptr pc, uptr addr) {
     #ifdef LOG_MUTEX_ACTIONS
     Printf("Mutex ReleaseStore (Clock ReleaseStore)");
     #endif
+    #ifdef PRINT_VECTOR_CLOCK
     PrintVectorClock(ctx, thr);
+    #endif
   }
   IncrementEpoch(thr);
 
@@ -554,7 +560,9 @@ void ReleaseStoreAcquire(ThreadState *thr, uptr pc, uptr addr) {
 
     #ifdef LOG_MUTEX_ACTIONS
     Printf("#%d: ReleaseStoreAcquire with vector clock %zx\n", thr->tid, addr);
+    #ifdef PRINT_VECTOR_CLOCK
     PrintVectorClock(ctx, thr);
+    #endif
     #endif
   }
 
