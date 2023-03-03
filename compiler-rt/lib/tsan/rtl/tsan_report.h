@@ -122,6 +122,7 @@ class ReportDesc {
 // Format and output the report to the console/log. No additional logic.
 void PrintReport(const ReportDesc *rep);
 void PrintStack(const ReportStack *stack);
+void PrintFileAndLineOfStack(const ReportStack *stack);
 
 }  // namespace __tsan
 

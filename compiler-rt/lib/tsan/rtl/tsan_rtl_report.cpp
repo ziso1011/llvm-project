@@ -828,6 +828,12 @@ void PrintCurrentStack(ThreadState *thr, uptr pc) {
   PrintStack(SymbolizeStack(trace));
 }
 
+void PrintFileAndLine(ThreadState *thr, uptr pc) {
+  VarSizeStackTrace trace;
+  ObtainCurrentStack(thr, pc, &trace);
+  PrintFileAndLineOfStack(SymbolizeStack(trace));
+}
+
 // Always inlining PrintCurrentStackSlow, because LocatePcInTrace assumes
 // __sanitizer_print_stack_trace exists in the actual unwinded stack, but
 // tail-call to PrintCurrentStackSlow breaks this assumption because

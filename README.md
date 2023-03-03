@@ -77,7 +77,7 @@ To address this issue, the developers of TSan have designed a dedicated print me
 
 The file `log.h` can be found at `llvm-project/compiler-rt/lib/tsan/rtl/log.h`, and it contains several `#defines` that specify how logging is performed. To disable logging at specific locations, simply comment out the appropriate line.
 
-- `TSAN_DEFAULT_OUTPUT`: Enables the default Report output of Tsan.(implemented in `tsan_report.cpp`). To improve visibility of other logs, it is recommended to comment this out.
+- `ENABLE_TSAN_DEFAULT_OUTPUT`: Enables the default Report output of Tsan.(implemented in `tsan_report.cpp`). To improve visibility of other logs, it is recommended to comment this out.
 - `LOG_THREAD_ON_READ` : Enables logging of read Operations (implemented in `tsan_rtl_access.cpp`).
 - `LOG_THREAD_ON_WRITE` : Enables logging of write Operations in threads (implemented in `tsan_rtl_access.cpp`).
 - `LOG_MUTEX_LOCK_UNLOCK` : Enables logging for lock/unlock mutex operations (implemented in `tsan_rtl_mutex.cpp`).
@@ -86,6 +86,7 @@ The file `log.h` can be found at `llvm-project/compiler-rt/lib/tsan/rtl/log.h`, 
 - `LOG_THREAD_FINISH` : Enables logging if a thread is finished (implemented in `tsan_rtl_thread.cpp`).
 - `LOG_MUTEX_EPOCH_INCREMENTS`: Enables logging of epoch increments in the mutex (implemented in `tsan_rtl_mutex.cpp`).
 - `LOG_MUTEX_ACTIONS`: Enables logging of actions in the mutex (implemented in `tsan_rtl_mutex.cpp`).
+- `LOG_THREAD_EPOCH`: Enables logging of the thread epochs on the different events (impelemented in the respective files)
 
 **After making any changes, the project must also be recompiled !!!**
 

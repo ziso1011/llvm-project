@@ -425,45 +425,21 @@ ALWAYS_INLINE USED void MemoryAccess(ThreadState* thr, uptr pc, uptr addr,
   
   if (typ == kAccessWrite) {
     #ifdef LOG_THREAD_ON_WRITE
-    Printf("%d | wr(%p) | %u\n", thr->tid, (void *)addr, thr->fast_state.epoch());
-    PrintCurrentStack(thr, pc);
-
-    // VarSizeStackTrace traces[2];
-    // Tid tids[2] = {thr->tid, kInvalidTid};
-    // uptr tags[2] = {kExternalTagNone, kExternalTagNone};
-    
-    // uptr out_buf_size = 500;
-    // char out_buf[out_buf_size];
-    // ObtainCurrentStack(thr, thr->trace_prev_pc, &traces[0], &tags[0]);
-    // traces[0].PrintTo(out_buf, out_buf_size);
-    // Printf("%s\n", out_buf);
+      Printf("%d | rd(%p) | ", thr->tid, (void *)addr);
+      PrintFileAndLine(thr, pc);
+      #ifdef LOG_THREAD_EPOCH_ON_READ
+        Printf(" | %u", thr->fast_state.epoch());
+      #endif
+      Printf("\n");
     #endif
   } else if (typ == kAccessRead) {
     #ifdef LOG_THREAD_ON_READ
-    Printf("%d | rd(%p) | %u", thr->tid, (void *)addr, thr->fast_state.epoch());
-    PrintCurrentStack(thr, pc);
-
-    // VarSizeStackTrace traces[2];
-    // Tid tids[2] = {thr->tid, kInvalidTid};
-    // uptr tags[2] = {kExternalTagFirstUserAvailable, kExternalTagNone};
-    
-    // uptr out_buf_size = 500;
-    // char out_buf[out_buf_size];
-    // ObtainCurrentStack(thr, thr->trace_prev_pc, &traces[0], &tags[0]);
-    // traces[0].PrintTo(out_buf, out_buf_size);
-    // Printf("%s\n", out_buf);
-
-    // SymbolizedStack *frame = ent->frames;
-    // for (int i = 0; frame && frame->info.address; frame = frame->next, i++) {
-    //   InternalScopedString res;
-    //   RenderFrame(&res, common_flags()->stack_trace_format, i,
-    //               frame->info.address, &frame->info,
-    //               common_flags()->symbolize_vs_style,
-    //               common_flags()->strip_path_prefix, kInterposedFunctionPrefix);
-    //   Printf("%s\n", res.data());
-    // }
-    // Printf("\n");
-
+      Printf("%d | rd(%p) | ", thr->tid, (void *)addr);
+      PrintFileAndLine(thr, pc);
+      #ifdef LOG_THREAD_EPOCH
+        Printf(" | %u", thr->fast_state.epoch());
+      #endif
+      Printf("\n");
     #endif
   }
 

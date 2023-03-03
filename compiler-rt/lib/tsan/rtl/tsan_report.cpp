@@ -122,6 +122,29 @@ void PrintStack(const ReportStack *ent) {
   Printf("\n");
 }
 
+void PrintFileAndLineOfStack(const ReportStack *ent) {
+    if (ent == 0 || ent->frames == 0) {
+        Printf("[failed to restore the stack]");
+    }
+    SymbolizedStack *frame = ent->frames;
+    InternalScopedString res;
+
+    for (int i = 0; frame && frame->info.address; frame = frame->next, i++) {
+      // Print only the first frame as this is the one that is interesting
+      if (i > 0)
+        break;
+
+      // Renders <source file>:<line number>
+      // %s:%l - %f
+      RenderFrame(&res, "%s:%l", i,
+                  frame->info.address, &frame->info,
+                  common_flags()->symbolize_vs_style,
+                  common_flags()->strip_path_prefix, "wrap_");
+
+      Printf("%s", res.data());
+    }
+}
+
 static void PrintMutexSet(Vector<ReportMopMutex> const& mset) {
   for (uptr i = 0; i < mset.Size(); i++) {
     if (i == 0)
@@ -300,7 +323,7 @@ static SymbolizedStack *SkipTsanInternalFrames(SymbolizedStack *frames) {
 }
 
 void PrintReport(const ReportDesc *rep) {
-  #ifdef TSAN_DEFAULT_OUTPUT
+  #ifdef ENABLE_TSAN_DEFAULT_OUTPUT
   Decorator d;
   Printf("==================\n");
   const char *rep_typ_str = ReportTypeString(rep->typ, rep->tag);
@@ -398,6 +421,11 @@ void PrintStack(const ReportStack *ent) {
            StripPathPrefix(info.file, common_flags()->strip_path_prefix),
            info.line, info.module_offset);
   }
+}
+
+
+void PrintFileAndLineOfStack(const ReportStack *ent) {
+  Printf("Not implemented for Go\n");
 }
 
 static void PrintMop(const ReportMop *mop, bool first) {
