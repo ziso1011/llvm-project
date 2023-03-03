@@ -425,7 +425,7 @@ ALWAYS_INLINE USED void MemoryAccess(ThreadState* thr, uptr pc, uptr addr,
   
   if (typ == kAccessWrite) {
     #ifdef LOG_THREAD_ON_WRITE
-    Printf("%d | wr(%d) | %u\n", thr->tid, addr, thr->fast_state.epoch());
+    Printf("%d | wr(%p) | %u\n", thr->tid, (void *)addr, thr->fast_state.epoch());
     PrintCurrentStack(thr, pc);
 
     // VarSizeStackTrace traces[2];
@@ -440,7 +440,7 @@ ALWAYS_INLINE USED void MemoryAccess(ThreadState* thr, uptr pc, uptr addr,
     #endif
   } else if (typ == kAccessRead) {
     #ifdef LOG_THREAD_ON_READ
-    Printf("%d | rd(%d) | %u", thr->tid, addr, thr->fast_state.epoch());
+    Printf("%d | rd(%p) | %u", thr->tid, (void *)addr, thr->fast_state.epoch());
     PrintCurrentStack(thr, pc);
 
     // VarSizeStackTrace traces[2];

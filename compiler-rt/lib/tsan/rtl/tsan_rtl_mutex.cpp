@@ -70,7 +70,7 @@ static void RecordMutexLock(ThreadState *thr, uptr pc, uptr addr,
                             StackID stack_id, bool write) {
   auto typ = write ? EventType::kLock : EventType::kRLock;
 #ifdef LOG_MUTEX_LOCK_UNLOCK
-  Printf("%d | l(%d) | %u\n", thr->tid, addr, thr->fast_state.epoch());
+  Printf("%d | l(%p) | %u\n", thr->tid, addr, thr->fast_state.epoch());
 #endif
   // Note: it's important to trace before modifying mutex set
   // because tracing can switch trace part and we write the current
@@ -84,7 +84,7 @@ static void RecordMutexLock(ThreadState *thr, uptr pc, uptr addr,
 static void RecordMutexUnlock(ThreadState *thr, uptr addr) {
   // See the comment in RecordMutexLock re order of operations.
 #ifdef LOG_MUTEX_LOCK_UNLOCK
-  Printf("%d | u(%d) | %u\n", thr->tid, addr, thr->fast_state.epoch());
+  Printf("%d | u(%p) | %u\n", thr->tid, addr, thr->fast_state.epoch());
 #endif
   TraceMutexUnlock(thr, addr);
   thr->mset.DelAddr(addr);
