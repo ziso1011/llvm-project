@@ -12,7 +12,7 @@
 
 ## Build
 
-1. Clone project
+1. Clone this project
 2. `mkdir build && cd build`
 3. `cmake -DLLVM_ENABLE_PROJECTS="clang;compiler-rt;" DCMAKE_BUILD_TYPE=Release ../llvm_source`
     This will build clang and the runtime libraries including the ThreadSanitizer project.
@@ -91,19 +91,21 @@ The file `log.h` can be found at `llvm-project/compiler-rt/lib/tsan/rtl/log.h`, 
 
 **Note**: "Due to the output not being thread-safe, there may be print races. Unfortunately, uncommenting LOG_CODE_LINE also leads to faulty or inconsistent output. Therefore, the output should always be considered with caution."
 
-**After making any changes, the project must also be recompiled !!!**
+**After making any changes, the LLVM compiler must also be recompiled !!!**
 
 ### Output format
 
-- `Read`: ThreadID | r(memory address) | epoch | line of code
-- `Write`: ThreadID | wr(memory address) | epoch | line of code
-- `Lock`: ThreadID | l(memory address) | epoch | line of code
-- `Unlock`: ThreadID | u(memory address) | epoch | line of code
-- `Join`: ThreadID | j(terminated Thread) | epoch
-- `Fork`: ThreadID | f(started Thread) | epoch
-- `Finished`: ThreadID: Finished
+- `Read`: Thread ThreadID | r(memory address) | line of code | epoch
+- `Write`: Thread ThreadID | wr(memory address) | line of code | epoch 
+- `Lock`: Thread ThreadID | l(memory address) | line of code | epoch
+- `Unlock`: Thread ThreadID | u(memory address) | line of code | epoch
+- `Join`: Thread ThreadID | j(terminated Thread) | epoch
+- `Fork`: Thread ThreadID | f(started Thread) | epoch
+- `Finished`: Thread ThreadID: Finished
 
-**Note**: `epoch` and `line of code` are optional. (Adding line of code may lead to faulty outputs).
+### Printing function
+
+In order to print output without data races in TSan itself and to avoid repeating code, we wrote a function deep down in the stack of Tsan. It is called `PrintFileAndLine` (defined in `tsan_rtl_report.cpp`) and calls `PrintFileAndLineOfStack` (defined in `tsan_report.cpp`). Its arguments are the thread state, the address of the variable/lock being acted upon and a string representing the event (e.g. "rd" for reading a variable) and it logs the event in the output format from above.
 
 ### Print statement locations
 
@@ -115,11 +117,11 @@ ALWAYS_INLINE USED void MemoryAccess(ThreadState* thr, uptr pc, uptr addr,
  
   if (typ == kAccessWrite) {
     #ifdef LOG_THREAD_ON_WRITE
-    Printf("%d | wr(%d) | %u\n", thr->tid, addr, thr->fast_state.epoch());
+    PrintFileAndLine(thr, pc, "wr", addr);
     #endif
   } else if (typ == kAccessRead) {
     #ifdef LOG_THREAD_ON_READ
-    Printf("%d | rd(%d) | %u\n", thr->tid, addr, thr->fast_state.epoch());
+    PrintFileAndLine(thr, pc, "rd", addr);
     #endif
   }
   ...
@@ -132,7 +134,7 @@ static void RecordMutexLock(ThreadState *thr, uptr pc, uptr addr,
                             StackID stack_id, bool write) {
   auto typ = write ? EventType::kLock : EventType::kRLock;
   #ifdef LOG_MUTEX_LOCK_UNLOCK
-  Printf("%d | l(%d) | %u\n", thr->tid, addr, thr->fast_state.epoch());
+    PrintFileAndLine(thr, pc, "l", addr);
   #endif
   // Note: it's important to trace before modifying mutex set
   // because tracing can switch trace part and we write the current
@@ -146,7 +148,7 @@ static void RecordMutexLock(ThreadState *thr, uptr pc, uptr addr,
 static void RecordMutexUnlock(ThreadState *thr, uptr addr) {
   // See the comment in RecordMutexLock re order of operations.
   #ifdef LOG_MUTEX_LOCK_UNLOCK
-  Printf("%d | u(%d) | %u\n", thr->tid, addr, thr->fast_state.epoch());
+  PrintFileAndLine(thr, pc, "u", addr);
   #endif
   TraceMutexUnlock(thr, addr);
   thr->mset.DelAddr(addr);
@@ -241,7 +243,7 @@ This function prints the state of the vector clock at a certain time.
 
 ### Example Output
 
-Example output for the following program:
+Example output for the following program (`Abgabe Julian/examples/locking_example.cc`):
 ```cpp
 #include <iostream>
 #include <thread>
@@ -260,7 +262,7 @@ void T1() {
 }
 
 void T2() {
-    z = a1 + a2;
+    z = x + y;
     m.lock();
     m.unlock();
 }
@@ -280,20 +282,48 @@ int main() {
 
 Generated Output:
 ```
+// Main thread gets spawned
 Thread -1 | f(0)
 
-Thread 1 | l(0x00010410c000) | djit_example.cc:11
-Thread 1 | wr(0x00010410c040) | djit_example.cc:12
-Thread 1 | u(0x00010410c000) | djit_example.cc:13
-Thread 1 | wr(0x00010410c044) | djit_example.cc:14
-Thread 2 | rd(0x00010410c040) | djit_example.cc:19
-Thtread 0 | j(1) 
-Thread 2 | rd(0x00010410c044) | djit_example.cc:20
-Thread 2 | wr(0x00010410c048) | djit_example.cc:21
-Thread 0 | j(2)
-Thread 0 | rd(0x00010410c048) | djit_example.cc:33
+// Spawn of thread 1 by main thread
+Thread 0 | f(1)
 
+// Spawn of thread 1 by main thread
+Thread 0 | f(2)
+
+// Lock of mutex by thread 1
+Thread 1 | l(0x00010410c000) | locking_example.cc:11
+
+// Write to variable x by thread 1
+Thread 1 | wr(0x00010410c040) | locking_example.cc:12
+
+// Unlock of mutex by thread 1
+Thread 1 | u(0x00010410c000) | locking_example.cc:13
+
+// Write to variable y by thread 1
+Thread 1 | wr(0x00010410c044) | locking_example.cc:14
+
+// Read of variable x by thread 2
+Thread 2 | rd(0x00010410c040) | locking_example.cc:19
+
+// Main thread joins thread 1
+Thread 0 | j(1) 
+
+// Read of variable y by thread 2
+Thread 2 | rd(0x00010410c044) | locking_example.cc:20
+
+// Write to variably z by thread 2
+Thread 2 | wr(0x00010410c048) | locking_example.cc:21
+
+// Main thread joins thread 2
+Thread 0 | j(2)
+
+// Main thread reads z to output it in the console
+Thread 0 | rd(0x00010410c048) | locking_example.cc:33
+
+// Report of the thread sanitizer, if enabled
 ThreadSanitizer: reported 1 warnings
+<report>
 ```
 
 ## Common Problems

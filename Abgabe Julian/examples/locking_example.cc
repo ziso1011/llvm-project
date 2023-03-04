@@ -15,7 +15,7 @@ void T1() {
 }
 
 void T2() {
-    z = a1 + a2;
+    z = x + y;
     m.lock();
     m.unlock();
 }
