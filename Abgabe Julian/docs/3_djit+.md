@@ -1,8 +1,5 @@
 # DJIT+
 
-Based on [Efficient On-the-Fly Data Race Detection in
-Multithreaded C++ Programs](https://www.researchgate.net/publication)
-
 The DJIT+ algorithm is a method for detecting data races in multithreaded program, that is based on the vector clocks (VC) discussed before. A
 
 To identify data races, i.e. concurrent conflicting accesses, a *happens-before* relationship has to be established between the actions of different threads. To that end, the `DJIT+` algorithm uses vector clocks.
@@ -163,4 +160,5 @@ The algorithm will perform the following steps:
 8. $T_2$ releases lock m. This is an event that updates its vector clock to [2, 2].
 9. ...
 
-<!-- TODO: Visualize example -->
+## Sources
+- [Efficient On-the-Fly Data Race Detection in Multithreaded C++ Programs](https://www.researchgate.net/publication)

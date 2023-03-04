@@ -43,7 +43,7 @@ Acquiring and releasing locks is handled exactly as in the DJIT+ algorithm, as b
 
 When a thread $t$ reads from a variable $x$, FastTrack distinguishes between four cases. 
 
-- **Subsequent reads from the same epoch**: This happens, when the reads happen within the same and epoch. The reads might be from the same thread or from different threads, as long as their logical clock values are the same. In this case, $R_x$ is an epoch and $R_x$ is not updated, as the read happened in the same epoch as the read before it. No race conditions may occur in this case. In this case, no race condition may occur. 
+- **Subsequent reads from the same epoch**: This happens, when the reads happen within the same and epoch. The reads might be from the same thread or from different threads, as long as their logical clock values are the same. In this case, $R_x$ is an epoch and $R_x$ is just updated to the current read epoch. No race conditions may occur in this case.
 
     These cases make up 78% of all read operations and require nearly no computing resources at all. If this case is true, no further computations or checks need to be done and the handling of the read operation by FastTrack is finished.
 
@@ -146,7 +146,7 @@ The algorithm will perform the following steps:
     - $R_y = 0@0$, $W_y = 0@0$
     - $R_z = 0@0$, $W_z = 0@0$
 
-3. $T_1$ releases lock m. Releasing the lock sets its vector clock to $C_{T_1}$: $L_m \leftarrow C_{T_1} = [1, 0]$. Additionally, the epoch of thread $t$ is incremented and  its vector clock is updated to $[1, 0]$, as a new time frame for thread $T_1$ begins.
+3. $T_1$ releases lock m. Releasing the lock sets its vector clock to $C_{T_1}, indicating that thread 1 release the lock in epoch $1@1$$: $L_m \leftarrow C_{T_1} = [1, 0]$. Additionally, the epoch of thread $t$ is incremented and its vector clock is updated to $[1, 0]$, as a new time frame for thread $T_1$ begins.
 
     New state: 
     - $C_1 = [1, 0]$
@@ -166,24 +166,17 @@ The algorithm will perform the following steps:
     - $R_y = 0@0$, $W_y = 0@0$
     - $R_z = 0@0$, $W_z = 0@0$
 
-5. $T_2$ reads from x. This happens in epoch 
+5. $T_2$ reads from x (as part of the operation `int z = x + y`). As this happens in epoch $0@2$ and $R_x = 0@0$ (no previous read), the algorithm just updates to reflect this read access: $R_x \leftarrow 0@2$. It then checks for a write-read race. As $W_x = 2@1 > 0@2 = C_{T_2}[T_2]$, **a write-read race is detected in reported**.
 
     New state: 
     - $C_1 = [2, 1]$
     - $C_2 = [1, 1]$
     - $L_m = [1, 0]$
-    - $R_x = 0@0$, $W_x = 2@1$
-    - $R_y = 0@0$, $W_y = 0@0$
+    - $R_x = 0@2$, $W_x = 2@1$
+    - $R_y = 0@2$, $W_y = 0@0$
     - $R_z = 0@0$, $W_z = 0@0$
+6. ...
 
-This is the first read access to x in the current time frame of $T_2$. Two things happen:
-    - The algorithm logs this access by updating $R_x[T_2] \leftarrow C_{T_2}[T_2] = 1$.
-    - The algorithm checks whether thread $T_1$ released a lock before writing to $x$. As $W_{x}[T_1] = 1 \lt C_{T_1}[T_1] = 2$, this is not the case. Hence, no data race is reported.
-6. $T_2$ reads from y. This is the first read access to y in the current time frame of $T_2$. Two things happen:
-    - The algorithm logs this access by updating $R_y[T_2] \leftarrow C_{T_2}[T_2] = 1$.
-    - The algorithm checks whether thread $T_1$ released a lock before writing to $<$. As $W_{<}[T_1] = 2 \geq C_{T_1}[T_1] = 2$, this is the case. 
-    
-      **Therefore a data race is reported.**
-7. $T_2$ acquires lock m. This is an event that updates its vector clock to [2, 1].
-8. $T_2$ releases lock m. This is an event that updates its vector clock to [2, 2].
-9. ...
+## Sources:
+- [FastTrack: efficient and precise dynamic race detection](https://dl.acm.org/doi/10.1145/1543135.1542490)
+- [The FastTrack 2 Race Detector - Technical Report](http://dept.cs.williams.edu/~freund/papers/ft2-techreport.pdf)

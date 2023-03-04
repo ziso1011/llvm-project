@@ -95,6 +95,6 @@ We will discuss in later sections how traces can be used to determine (data) rac
 
 ## FastTrack and ThreadSanitizer
 
-$\textit{FastTrack}$ is dynamic post-mortem data race detection technique presented in [[3]](https://dl.acm.org/doi/abs/10.1145/1543135.1542490?casa_token=Mx7WqwWcF1IAAAAA:n23wZjVnOMFBbqcMWEsuODH-3-JfJMmwJxWGFa9Ihv4vG5IMZ8bajMSkQqRsYxmFi79XG6N5akhd). It is the theoretical basis of the [ThreadSanitizer](https://github.com/llvm/llvm-project/tree/main/compiler-rt/lib/tsan) implemented in the [LLVM project](https://llvm.org/).
+$\textit{FastTrack}$ is dynamic data race detection technique presented in [[3]](https://dl.acm.org/doi/abs/10.1145/1543135.1542490?casa_token=Mx7WqwWcF1IAAAAA:n23wZjVnOMFBbqcMWEsuODH-3-JfJMmwJxWGFa9Ihv4vG5IMZ8bajMSkQqRsYxmFi79XG6N5akhd). It is the theoretical basis of the [ThreadSanitizer](https://github.com/llvm/llvm-project/tree/main/compiler-rt/lib/tsan) implemented in the [LLVM project](https://llvm.org/).
 
-In order to understand $\textit{FastTrack}$, we will first look at Lamports happens-before relation, vector clocks and the  $\textit{DJIT+}$ algorithm FastTrack is based on.
+In order to understand $\textit{FastTrack}$, we will first look at Lamports happens-before relation, Lamport clocks, vector clocks and the  $\textit{DJIT+}$ algorithm FastTrack is based on.

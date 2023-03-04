@@ -16,8 +16,6 @@ In his paper, Lamport proposes a mechanism that fulfills this condition. Each pr
 2. When a process sends a message, it includes its counter value with the message after executing step 1
 3. On receiving a message, the counter of the recipient is set to the greater of its current counter value and the counter value received in the timestamp, and subsequently incremented by 1
 
-<!-- TODO: Example with image -->
-
 ### Shortcoming of the Lamport clock
 
 Consider two events $e$, $e'$, that are not casually related ($e || e'$). As a result they might get assigned the same or different timestamps which can lead to three different outcomes:
