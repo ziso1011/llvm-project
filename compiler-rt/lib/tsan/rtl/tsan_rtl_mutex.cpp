@@ -70,10 +70,13 @@ static void RecordMutexLock(ThreadState *thr, uptr pc, uptr addr,
                             StackID stack_id, bool write) {
   auto typ = write ? EventType::kLock : EventType::kRLock;
   #ifdef LOG_MUTEX_LOCK_UNLOCK
-    Printf("%d | l(%p) | ", thr->tid, (void *)addr);
-    PrintFileAndLine(thr, pc);
     #ifdef LOG_THREAD_EPOCH
-      Printf(" | %u", thr->fast_state.epoch());
+      Printf("%d | l(%p) | %u ", thr->tid, (void *)addr, thr->fast_state.epoch());
+    #else
+      Printf("%d | u(%p) ", thr->tid, (void *)addr);
+    #endif
+    #ifdef LOG_CODE_LINE
+       PrintFileAndLine(thr, pc);
     #endif
     Printf("\n");
   #endif
@@ -88,8 +91,8 @@ static void RecordMutexLock(ThreadState *thr, uptr pc, uptr addr,
 
 static void RecordMutexUnlock(ThreadState *thr, uptr addr) {
   // See the comment in RecordMutexLock re order of operations.
-  TraceMutexUnlock(thr, addr);
-  thr->mset.DelAddr(addr);
+    TraceMutexUnlock(thr, addr);
+    thr->mset.DelAddr(addr);
 }
 
 void MutexCreate(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
@@ -224,16 +227,17 @@ void MutexPostLock(ThreadState *thr, uptr pc, uptr addr, u32 flagz, int rec) {
 
 int MutexUnlock(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
   DPrintf("#%d: MutexUnlock %zx flagz=0x%x\n", thr->tid, addr, flagz);
-
   #ifdef LOG_MUTEX_LOCK_UNLOCK
-    Printf("%d | u(%p) | ", thr->tid, (void *)addr);
-    PrintFileAndLine(thr, pc);
     #ifdef LOG_THREAD_EPOCH
-      Printf(" | %u", thr->fast_state.epoch());
+      Printf("%d | u(%p) | %u ", thr->tid, (void *)addr, thr->fast_state.epoch());
+    #else
+      Printf("%d | u(%p) ", thr->tid, (void *)addr);
     #endif
-    Printf("\n");
+    #ifdef LOG_CODE_LINE
+      PrintFileAndLine(thr, pc);
+    #endif
+      Printf("\n");
   #endif
-  
   if (pc && IsAppMem(addr))
     MemoryAccess(thr, pc, addr, 1, kAccessRead | kAccessAtomic);
   StackID creation_stack_id;

@@ -141,7 +141,7 @@ void PrintFileAndLineOfStack(const ReportStack *ent) {
                   common_flags()->symbolize_vs_style,
                   common_flags()->strip_path_prefix, "wrap_");
 
-      Printf("%s", res.data());
+      Printf("| %s", res.data());
     }
 }
 

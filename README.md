@@ -86,19 +86,24 @@ The file `log.h` can be found at `llvm-project/compiler-rt/lib/tsan/rtl/log.h`, 
 - `LOG_THREAD_FINISH` : Enables logging if a thread is finished (implemented in `tsan_rtl_thread.cpp`).
 - `LOG_MUTEX_EPOCH_INCREMENTS`: Enables logging of epoch increments in the mutex (implemented in `tsan_rtl_mutex.cpp`).
 - `LOG_MUTEX_ACTIONS`: Enables logging of actions in the mutex (implemented in `tsan_rtl_mutex.cpp`).
-- `LOG_THREAD_EPOCH`: Enables logging of the thread epochs on the different events (impelemented in the respective files)
+- `LOG_THREAD_EPOCH`: Enables logging of the thread epochs on the different events (impelemented in the respective files).
+- `LOG_CODE_LINE` : Enables logging of the line of code (impelemented in the respective files).
+
+**Note**: "Due to the output not being thread-safe, there may be print races. Unfortunately, uncommenting LOG_CODE_LINE also leads to faulty or inconsistent output. Therefore, the output should always be considered with caution."
 
 **After making any changes, the project must also be recompiled !!!**
 
 ### Output format
 
-- `Read`: ThreadID | r(memory address) | epoch
-- `Write`: ThreadID | wr(memory address) | epoch
-- `Lock`: ThreadID | l(memory address) | epoch
-- `Unlock`: ThreadID | u(memory address) | epoch
+- `Read`: ThreadID | r(memory address) | epoch | line of code
+- `Write`: ThreadID | wr(memory address) | epoch | line of code
+- `Lock`: ThreadID | l(memory address) | epoch | line of code
+- `Unlock`: ThreadID | u(memory address) | epoch | line of code
 - `Join`: ThreadID | j(terminated Thread) | epoch
 - `Fork`: ThreadID | f(started Thread) | epoch
 - `Finished`: ThreadID: Finished
+
+**Note**: `epoch` and `line of code` are optional. (Adding line of code may lead to faulty outputs).
 
 ### Print statement locations
 
@@ -237,12 +242,49 @@ This function prints the state of the vector clock at a certain time.
 ### Example Output
 
 Example output for the following program:
-```
-TODO program
+```cpp
+#include <pthread.h>
+#include <stdio.h>
+
+int Global;
+pthread_mutex_t mutex;
+
+void *Thread1(void *x) {
+    pthread_mutex_lock(&mutex);
+    Global++;
+    pthread_mutex_unlock(&mutex);
+  return NULL;
+}
+
+void *Thread2(void *x) {
+  Global--;
+  return NULL;
+}
+
+int main() {
+     for(int i=0; i<1; i++) {
+         pthread_t t[3];
+         pthread_create(&t[0], NULL, Thread1, NULL);
+         pthread_create(&t[1], NULL, Thread2, NULL);
+         pthread_join(t[0], NULL);
+         pthread_join(t[1], NULL);
+     }
+}
 ```
 Generated Output:
 
-TODO output
+```
+-1 | f(0)
+0 | f(1)
+1 | l(0x55aa8dbd66f0) | 1
+1 | wr(0x55aa8dbd66e8) | 1
+1 | u(0x55aa8dbd66f0) | 1
+0 | f(2)
+2 | wr(0x55aa8dbd66e8) | 1
+0 | j(1)
+0 | j(2)
+ThreadSanitizer: reported 1 warnings
+```
 
 ## Common Problems
 
