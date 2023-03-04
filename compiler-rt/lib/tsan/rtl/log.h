@@ -30,6 +30,5 @@ namespace __tsan {
 // #define LOG_MUTEX_EPOCH_INCREMENTS
 // #define LOG_MUTEX_ACTIONS
 // #define LOG_VECTOR_CLOCK
-// #define LOG_CODE_LINE
 
 #endif // !TSAN_LOG_H

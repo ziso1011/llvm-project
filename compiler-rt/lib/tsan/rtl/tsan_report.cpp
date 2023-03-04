@@ -122,27 +122,24 @@ void PrintStack(const ReportStack *ent) {
   Printf("\n");
 }
 
-void PrintFileAndLineOfStack(const ReportStack *ent) {
+void PrintFileAndLineOfStack(const ReportStack *ent, ThreadState *thr, const char* action, uptr addr) {
     if (ent == 0 || ent->frames == 0) {
         Printf("[failed to restore the stack]");
     }
     SymbolizedStack *frame = ent->frames;
     InternalScopedString res;
 
-    for (int i = 0; frame && frame->info.address; frame = frame->next, i++) {
-      // Print only the first frame as this is the one that is interesting
-      if (i > 0)
-        break;
-
-      // Renders <source file>:<line number>
-      // %s:%l - %f
-      RenderFrame(&res, "%s:%l", i,
+      RenderFrame(&res, "%s:%l", 0,
                   frame->info.address, &frame->info,
                   common_flags()->symbolize_vs_style,
                   common_flags()->strip_path_prefix, "wrap_");
 
-      Printf("| %s", res.data());
-    }
+    #ifdef LOG_THREAD_EPOCH
+      Printf("Thread %d | %s(%p) | %s | %u\n", thr->tid, action, (void *)addr,  res.data(), thr->fast_state.epoch());
+    #else
+      Printf("Thread %d | %s(%p) | %s | %u\n", thr->tid, action, (void *)addr,  res.data());
+    #endif
+    
 }
 
 static void PrintMutexSet(Vector<ReportMopMutex> const& mset) {
@@ -424,7 +421,7 @@ void PrintStack(const ReportStack *ent) {
 }
 
 
-void PrintFileAndLineOfStack(const ReportStack *ent) {
+void PrintFileAndLineOfStack(const ReportStack *ent, ThreadState *thr, const char* action, uptr addr)
   Printf("Not implemented for Go\n");
 }
 

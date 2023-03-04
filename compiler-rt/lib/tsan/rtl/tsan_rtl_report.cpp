@@ -828,10 +828,10 @@ void PrintCurrentStack(ThreadState *thr, uptr pc) {
   PrintStack(SymbolizeStack(trace));
 }
 
-void PrintFileAndLine(ThreadState *thr, uptr pc) {
+void PrintFileAndLine(ThreadState *thr, uptr pc, const char* action, uptr addr) {
   VarSizeStackTrace trace;
   ObtainCurrentStack(thr, pc, &trace);
-  PrintFileAndLineOfStack(SymbolizeStack(trace));
+  PrintFileAndLineOfStack(SymbolizeStack(trace), thr, action, addr);
 }
 
 // Always inlining PrintCurrentStackSlow, because LocatePcInTrace assumes

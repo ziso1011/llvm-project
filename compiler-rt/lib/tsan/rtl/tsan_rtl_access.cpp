@@ -425,26 +425,11 @@ ALWAYS_INLINE USED void MemoryAccess(ThreadState* thr, uptr pc, uptr addr,
   
   if (typ == kAccessWrite) {
     #ifdef LOG_THREAD_ON_WRITE
-      #ifdef LOG_THREAD_EPOCH
-        Printf("%d | wr(%p) | %u", thr->tid, (void *)addr, thr->fast_state.epoch());
-      #else
-        Printf("%d | wr(%p)", thr->tid, (void *)addr);
-      #endif
-      #ifdef LOG_CODE_LINE
-        PrintFileAndLine(thr, pc);
-      #endif
-        Printf("\n");
+      PrintFileAndLine(thr, pc, "wr", addr);
     #endif
   } else if (typ == kAccessRead) {
     #ifdef LOG_THREAD_ON_READ
-      #ifdef LOG_THREAD_EPOCH
-       Printf("%d | rd(%p) | %u", thr->tid, (void *)addr, thr->fast_state.epoch());
-      #else
-       Printf("%d | rd(%p)", thr->tid, (void *)addr);
-      #endif
-      #ifdef LOG_CODE_LINE
-         PrintFileAndLine(thr, pc);
-      #endif
+      PrintFileAndLine(thr, pc, "rd", addr);
       Printf("\n");
     #endif
   }
