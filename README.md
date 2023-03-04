@@ -243,46 +243,56 @@ This function prints the state of the vector clock at a certain time.
 
 Example output for the following program:
 ```cpp
-#include <pthread.h>
-#include <stdio.h>
+#include <iostream>
+#include <thread>
+#include <mutex>
 
-int Global;
-pthread_mutex_t mutex;
+std::mutex m;
+int x = 0;
+int y = 0;
+int z = 0;
 
-void *Thread1(void *x) {
-    pthread_mutex_lock(&mutex);
-    Global++;
-    pthread_mutex_unlock(&mutex);
-  return NULL;
+void T1() {
+    m.lock();
+    x = 1;
+    m.unlock();
+    y = 2;
 }
 
-void *Thread2(void *x) {
-  Global--;
-  return NULL;
+void T2() {
+    z = a1 + a2;
+    m.lock();
+    m.unlock();
 }
 
 int main() {
-     for(int i=0; i<1; i++) {
-         pthread_t t[3];
-         pthread_create(&t[0], NULL, Thread1, NULL);
-         pthread_create(&t[1], NULL, Thread2, NULL);
-         pthread_join(t[0], NULL);
-         pthread_join(t[1], NULL);
-     }
+    std::thread t1(T1);
+    std::thread t2(T2);
+    
+    t1.join();
+    t2.join();
+
+    std::cout << "z: " << z << std::endl;
+
+    return 0;
 }
 ```
-Generated Output:
 
+Generated Output:
 ```
--1 | f(0)
-0 | f(1)
-1 | l(0x55aa8dbd66f0) | 1
-1 | wr(0x55aa8dbd66e8) | 1
-1 | u(0x55aa8dbd66f0) | 1
-0 | f(2)
-2 | wr(0x55aa8dbd66e8) | 1
-0 | j(1)
-0 | j(2)
+Thread -1 | f(0)
+
+Thread 1 | l(0x00010410c000) | djit_example.cc:11
+Thread 1 | wr(0x00010410c040) | djit_example.cc:12
+Thread 1 | u(0x00010410c000) | djit_example.cc:13
+Thread 1 | wr(0x00010410c044) | djit_example.cc:14
+Thread 2 | rd(0x00010410c040) | djit_example.cc:19
+Thtread 0 | j(1) 
+Thread 2 | rd(0x00010410c044) | djit_example.cc:20
+Thread 2 | wr(0x00010410c048) | djit_example.cc:21
+Thread 0 | j(2)
+Thread 0 | rd(0x00010410c048) | djit_example.cc:33
+
 ThreadSanitizer: reported 1 warnings
 ```
 

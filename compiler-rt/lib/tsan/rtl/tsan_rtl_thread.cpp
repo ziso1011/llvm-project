@@ -306,7 +306,7 @@ void ThreadJoin(ThreadState *thr, uptr pc, Tid tid) {
   CHECK_GT(tid, 0);
   DPrintf("#%d: ThreadJoin tid=%d\n", thr->tid, tid);
   #ifdef LOG_THREAD_JOIN
-  Printf("T %d | j(%d) \n", thr->tid, tid);
+  Printf("Thread %d | j(%d) \n", thr->tid, tid);
   #endif
   JoinArg arg = {};
   ctx->thread_registry.JoinThread(tid, &arg);

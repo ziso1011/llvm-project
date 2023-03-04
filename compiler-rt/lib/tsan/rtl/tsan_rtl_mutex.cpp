@@ -70,7 +70,7 @@ static void RecordMutexLock(ThreadState *thr, uptr pc, uptr addr,
                             StackID stack_id, bool write) {
   auto typ = write ? EventType::kLock : EventType::kRLock;
   #ifdef LOG_MUTEX_LOCK_UNLOCK
-    PrintFileAndLine(thr, pc, "lock", addr);
+    PrintFileAndLine(thr, pc, "l", addr);
   #endif
   // Note: it's important to trace before modifying mutex set
   // because tracing can switch trace part and we write the current
@@ -220,7 +220,7 @@ void MutexPostLock(ThreadState *thr, uptr pc, uptr addr, u32 flagz, int rec) {
 int MutexUnlock(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
   DPrintf("#%d: MutexUnlock %zx flagz=0x%x\n", thr->tid, addr, flagz);
   #ifdef LOG_MUTEX_LOCK_UNLOCK
-    PrintFileAndLine(thr, pc, "unlock", addr);
+    PrintFileAndLine(thr, pc, "u", addr);
   #endif
   if (pc && IsAppMem(addr))
     MemoryAccess(thr, pc, addr, 1, kAccessRead | kAccessAtomic);
