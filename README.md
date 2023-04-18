@@ -16,7 +16,7 @@
 2. `mkdir build && cd build`
 3. `cmake -DLLVM_ENABLE_PROJECTS="clang;compiler-rt;" DCMAKE_BUILD_TYPE=Release ../llvm_source`
     This will build clang and the runtime libraries including the ThreadSanitizer project.
-    For debug puprposes use `CMAKE_BUILD_TYPE=Debug`
+    For debug purposes use `CMAKE_BUILD_TYPE=Debug`
 4. `cmake --build . -jn`  to build with `n` cores.
 5. (optional) `make check-tsan` to build and run tests for TSan
 
